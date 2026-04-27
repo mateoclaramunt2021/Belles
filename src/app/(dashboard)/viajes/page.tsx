@@ -1,16 +1,25 @@
-'use client'
+﻿'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { DataTable, type Column } from '@/components/ui/DataTable'
-import { EstadoCobro } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { ViajeForm, defaultFormData } from '@/components/viajes/ViajeForm'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
-import { Plus, Pencil, Trash2, Filter, X } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Viaje } from '@/types'
+
+function fmt(n: number) { return (n ?? 0).toLocaleString('es-UY', { maximumFractionDigits: 0 }) }
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</label>
+      {children}
+    </div>
+  )
+}
 
 export default function ViajesPage() {
   const supabase = createClient()
@@ -22,12 +31,12 @@ export default function ViajesPage() {
   const [editLoading, setEditLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  // Filtros
-  const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
-  const [filtroFechaHasta, setFiltroFechaHasta] = useState('')
-  const [filtroMatricula, setFiltroMatricula] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const [fMat, setFMat] = useState('')
+  const [fCho, setFCho] = useState('')
+  const [fCli, setFCli] = useState('')
+  const [fMer, setFMer] = useState('')
+  const [fFrom, setFFrom] = useState('')
+  const [fTo, setFTo] = useState('')
 
   const fetchViajes = useCallback(async () => {
     setLoading(true)
@@ -36,235 +45,187 @@ export default function ViajesPage() {
       .select('*')
       .order('fecha', { ascending: false })
       .order('created_at', { ascending: false })
-
-    if (!isAdmin && profile?.id) q = q.eq('chofer_id', profile.id)
-    if (filtroFechaDesde) q = q.gte('fecha', filtroFechaDesde)
-    if (filtroFechaHasta) q = q.lte('fecha', filtroFechaHasta)
-    if (filtroMatricula)  q = q.ilike('matricula', `%${filtroMatricula}%`)
-    if (filtroEstado)     q = q.eq('estado_cobro', filtroEstado)
-
+    if (!isAdmin && profile?.id) q = (q as any).eq('chofer_id', profile.id)
     const { data } = await q
     setViajes((data as Viaje[]) ?? [])
     setLoading(false)
-  }, [supabase, isAdmin, profile?.id, filtroFechaDesde, filtroFechaHasta, filtroMatricula, filtroEstado])
+  }, [supabase, isAdmin, profile?.id])
 
   useEffect(() => { fetchViajes() }, [fetchViajes])
+
+  const matriculas  = useMemo(() => [...new Set(viajes.map(v => v.matricula))].sort(), [viajes])
+  const choferes    = useMemo(() => [...new Set(viajes.map(v => v.chofer_nombre).filter(Boolean))].sort(), [viajes])
+  const clientes    = useMemo(() => [...new Set(viajes.map(v => v.cliente_nombre).filter(Boolean))].sort(), [viajes])
+  const mercaderias = useMemo(() => [...new Set(viajes.map(v => v.mercaderia).filter(Boolean))].sort(), [viajes])
+
+  const filtered = useMemo(() => viajes.filter(v => {
+    if (fMat && v.matricula !== fMat) return false
+    if (fCho && v.chofer_nombre !== fCho) return false
+    if (fCli && v.cliente_nombre !== fCli) return false
+    if (fMer && v.mercaderia !== fMer) return false
+    if (fFrom && v.fecha < fFrom) return false
+    if (fTo && v.fecha > fTo) return false
+    return true
+  }), [viajes, fMat, fCho, fCli, fMer, fFrom, fTo])
+
+  const clearFilters = () => { setFMat(''); setFCho(''); setFCli(''); setFMer(''); setFFrom(''); setFTo('') }
 
   const handleDelete = async () => {
     if (!deleteId) return
     const { error } = await supabase.from('viajes').delete().eq('id', deleteId)
-    if (error) {
-      toast.error('Error al eliminar')
-    } else {
-      toast.success('Viaje eliminado')
-      setDeleteId(null)
-      fetchViajes()
-    }
+    if (error) { toast.error('Error al eliminar') }
+    else { toast.success('Viaje eliminado'); setDeleteId(null); fetchViajes() }
   }
 
   const handleEdit = async (data: typeof defaultFormData) => {
     if (!editViaje) return
     setEditLoading(true)
-    const { error } = await supabase
-      .from('viajes')
-      .update({
-        fecha:           data.fecha,
-        numero_remito:   data.numero_remito,
-        matricula:       data.matricula,
-        camion_id:       data.camion_id || null,
-        chofer_id:       data.chofer_id || null,
-        chofer_nombre:   data.chofer_nombre,
-        cliente_id:      data.cliente_id || null,
-        cliente_nombre:  data.cliente_nombre,
-        origen:          data.origen,
-        destino:         data.destino,
-        mercaderia:      data.mercaderia,
-        km:              data.km,
-        toneladas:       data.toneladas,
-        tarifa_aplicada: data.tarifa_aplicada,
-        importe:         data.importe,
-        gasto_gasoil:    data.gasto_gasoil,
-        litros_gasoil:   data.litros_gasoil,
-        comision:        data.comision,
-        peajes:          data.peajes,
-        estado_cobro:    data.estado_cobro,
-        notas:           data.notas || null,
-      })
-      .eq('id', editViaje.id)
-
+    const { error } = await supabase.from('viajes').update({
+      fecha: data.fecha, numero_remito: data.numero_remito, matricula: data.matricula,
+      camion_id: data.camion_id || null, chofer_id: data.chofer_id || null,
+      chofer_nombre: data.chofer_nombre, cliente_id: data.cliente_id || null,
+      cliente_nombre: data.cliente_nombre, origen: data.origen, destino: data.destino,
+      mercaderia: data.mercaderia, km: data.km, toneladas: data.toneladas,
+      tarifa_aplicada: data.tarifa_aplicada, importe: data.importe,
+      gasto_gasoil: data.gasto_gasoil, litros_gasoil: data.litros_gasoil,
+      comision: data.comision, peajes: data.peajes, estado_cobro: data.estado_cobro,
+      notas: data.notas || null,
+    }).eq('id', editViaje.id)
     setEditLoading(false)
-    if (error) {
-      toast.error('Error al actualizar')
-    } else {
-      toast.success('Viaje actualizado')
-      setEditViaje(null)
-      fetchViajes()
-    }
+    if (error) { toast.error('Error al actualizar') }
+    else { toast.success('Viaje actualizado'); setEditViaje(null); fetchViajes() }
   }
-
-  const clearFilters = () => {
-    setFiltroFechaDesde('')
-    setFiltroFechaHasta('')
-    setFiltroMatricula('')
-    setFiltroEstado('')
-  }
-
-  const activeFilters = [filtroFechaDesde, filtroFechaHasta, filtroMatricula, filtroEstado].filter(Boolean).length
-
-  const columns: Column<Viaje>[] = [
-    {
-      key: 'fecha',
-      header: 'Fecha',
-      render: (v) => <span className="font-data text-xs">{String(v)}</span>,
-    },
-    {
-      key: 'numero_remito',
-      header: 'Remito',
-      render: (v) => <span className="font-data text-xs text-accent-cyan">{String(v)}</span>,
-    },
-    {
-      key: 'matricula',
-      header: 'Matrícula',
-      render: (v) => <span className="font-data text-xs font-semibold">{String(v)}</span>,
-    },
-    ...(isAdmin ? [{
-      key: 'chofer_nombre',
-      header: 'Chofer',
-      className: 'hidden md:table-cell',
-      render: (v: unknown) => <span className="text-text-secondary">{String(v)}</span>,
-    }] as Column<Viaje>[] : []),
-    {
-      key: 'destino',
-      header: 'Destino',
-      className: 'hidden lg:table-cell',
-    },
-    {
-      key: 'toneladas',
-      header: 'Toneladas',
-      className: 'hidden md:table-cell',
-      render: (v) => <span className="font-data text-xs">{Number(v).toFixed(3)}</span>,
-    },
-    {
-      key: 'importe',
-      header: 'Importe',
-      render: (v) => (
-        <span className="font-data text-xs font-semibold text-success">
-          ${Number(v).toLocaleString('es-UY')}
-        </span>
-      ),
-    },
-    {
-      key: 'estado_cobro',
-      header: 'Estado',
-      render: (v) => <EstadoCobro estado={v as 'pendiente' | 'cobrado'} />,
-    },
-  ]
 
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">{isAdmin ? 'Viajes' : 'Mis Viajes'}</h1>
-          <p className="text-text-secondary text-sm mt-0.5">{viajes.length} registros</p>
+        <p className="font-mono text-xs text-text-secondary">{filtered.length} de {viajes.length} registros</p>
+        <Link href="/viajes/nuevo" className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={15} />
+          Nuevo Viaje
+        </Link>
+      </div>
+
+      {/* Inline Filters */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-3">
+          <svg className="w-3.5 h-3.5 text-accent-cyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          <span className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Filtros</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className={`btn-secondary flex items-center gap-2 text-sm relative ${showFilters ? 'border-accent-cyan/50 text-accent-cyan' : ''}`}
-          >
-            <Filter size={15} />
-            <span className="hidden sm:inline">Filtros</span>
-            {activeFilters > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-accent-cyan text-bg-primary text-xs rounded-full flex items-center justify-center font-bold">
-                {activeFilters}
-              </span>
-            )}
-          </button>
-          <Link href="/viajes/nuevo" className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={15} />
-            <span className="hidden sm:inline">Nuevo</span>
-          </Link>
+        <div className="flex flex-wrap gap-3 items-end">
+          <FilterGroup label="Matrícula">
+            <select className="input text-xs" value={fMat} onChange={e => setFMat(e.target.value)}>
+              <option value="">Todas</option>
+              {matriculas.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </FilterGroup>
+          {isAdmin && (
+            <FilterGroup label="Chofer">
+              <select className="input text-xs" value={fCho} onChange={e => setFCho(e.target.value)}>
+                <option value="">Todos</option>
+                {choferes.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </FilterGroup>
+          )}
+          <FilterGroup label="Cliente">
+            <select className="input text-xs" value={fCli} onChange={e => setFCli(e.target.value)}>
+              <option value="">Todos</option>
+              {clientes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </FilterGroup>
+          <FilterGroup label="Mercadería">
+            <select className="input text-xs" value={fMer} onChange={e => setFMer(e.target.value)}>
+              <option value="">Todas</option>
+              {mercaderias.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </FilterGroup>
+          <FilterGroup label="Desde">
+            <input type="date" className="input text-xs" value={fFrom} onChange={e => setFFrom(e.target.value)} />
+          </FilterGroup>
+          <FilterGroup label="Hasta">
+            <input type="date" className="input text-xs" value={fTo} onChange={e => setFTo(e.target.value)} />
+          </FilterGroup>
+          <button className="btn-ghost text-xs self-end" onClick={clearFilters}>Limpiar</button>
         </div>
       </div>
 
-      {/* Panel de filtros */}
-      {showFilters && (
-        <div className="card animate-fade-in">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-text-primary">Filtros</p>
-            {activeFilters > 0 && (
-              <button onClick={clearFilters} className="text-xs text-text-secondary hover:text-danger flex items-center gap-1">
-                <X size={12} /> Limpiar
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="form-group">
-              <label className="label">Desde</label>
-              <input type="date" className="input text-sm" value={filtroFechaDesde} onChange={(e) => setFiltroFechaDesde(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="label">Hasta</label>
-              <input type="date" className="input text-sm" value={filtroFechaHasta} onChange={(e) => setFiltroFechaHasta(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="label">Matrícula</label>
-              <input type="text" className="input text-sm font-mono" placeholder="FTP..." value={filtroMatricula} onChange={(e) => setFiltroMatricula(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="label">Estado cobro</label>
-              <select className="input text-sm" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
-                <option value="">Todos</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="cobrado">Cobrado</option>
-              </select>
-            </div>
-          </div>
+      {/* Table */}
+      <div className="bg-bg-secondary border border-border-color rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0 z-10">
+              <tr>
+                {['Fecha','Matrícula','Chofer','Cliente','Origen','Destino','Mercadería','Km','Tons','Importe','Gasoil','Comisión','Peajes','Beneficio','Acciones'].map(h => (
+                  <th key={h} className="table-header text-left whitespace-nowrap px-3 py-2.5">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={15} className="py-12 text-center">
+                    <div className="w-6 h-6 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin mx-auto" />
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={15} className="py-10 text-center text-text-secondary">Sin viajes registrados</td>
+                </tr>
+              ) : filtered.map(v => {
+                const profit = (v.importe ?? 0) - (v.gasto_gasoil ?? 0) - (v.comision ?? 0) - (v.peajes ?? 0)
+                return (
+                  <tr key={v.id} className="table-row-hover border-b border-border-color/50">
+                    <td className="table-cell font-mono whitespace-nowrap px-3">{v.fecha}</td>
+                    <td className="table-cell px-3 whitespace-nowrap">
+                      <span className="bg-accent-cyan/10 text-accent-cyan px-2 py-0.5 rounded font-mono text-xs font-semibold">{v.matricula}</span>
+                    </td>
+                    <td className="table-cell px-3 whitespace-nowrap">{v.chofer_nombre ?? '—'}</td>
+                    <td className="table-cell px-3 whitespace-nowrap">{v.cliente_nombre ?? '—'}</td>
+                    <td className="table-cell px-3 whitespace-nowrap">{v.origen ?? '—'}</td>
+                    <td className="table-cell px-3 whitespace-nowrap">{v.destino ?? '—'}</td>
+                    <td className="table-cell px-3">{v.mercaderia ?? '—'}</td>
+                    <td className="table-cell px-3 text-right font-mono">{fmt(v.km ?? 0)}</td>
+                    <td className="table-cell px-3 text-right font-mono">{(v.toneladas ?? 0).toFixed(2)}</td>
+                    <td className="table-cell px-3 text-right font-mono whitespace-nowrap">${fmt(v.importe ?? 0)}</td>
+                    <td className="table-cell px-3 text-right font-mono text-danger whitespace-nowrap">${fmt(v.gasto_gasoil ?? 0)}</td>
+                    <td className="table-cell px-3 text-right font-mono whitespace-nowrap">${fmt(v.comision ?? 0)}</td>
+                    <td className="table-cell px-3 text-right font-mono whitespace-nowrap">${fmt(v.peajes ?? 0)}</td>
+                    <td className={`table-cell px-3 text-right font-mono font-semibold whitespace-nowrap ${profit >= 0 ? 'text-success' : 'text-danger'}`}>
+                      ${fmt(profit)}
+                    </td>
+                    <td className="table-cell px-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditViaje(v)}
+                          className="p-1.5 rounded text-text-secondary hover:text-accent-cyan hover:bg-accent-cyan/10 transition-all"
+                          title="Editar"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setDeleteId(v.id)}
+                            className="p-1.5 rounded text-text-secondary hover:text-danger hover:bg-danger/10 transition-all"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {/* Tabla */}
-      <div className="card p-0 overflow-hidden">
-        <DataTable
-          columns={columns}
-          data={viajes}
-          keyField="id"
-          loading={loading}
-          searchable
-          searchPlaceholder="Buscar por remito, matrícula, destino..."
-          searchFields={['numero_remito', 'matricula', 'destino', 'chofer_nombre', 'cliente_nombre']}
-          emptyMessage="No hay viajes registrados"
-          actions={(row) => (
-            <div className="flex items-center justify-end gap-1">
-              <button
-                onClick={() => setEditViaje(row)}
-                className="p-1.5 rounded-lg text-text-secondary hover:text-accent-cyan hover:bg-accent-cyan/10 transition-all"
-                title="Editar"
-              >
-                <Pencil size={14} />
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setDeleteId(row.id)}
-                  className="p-1.5 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-all"
-                  title="Eliminar"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          )}
-        />
       </div>
 
       {/* Modal editar */}
-      <Modal
-        open={!!editViaje}
-        onClose={() => setEditViaje(null)}
-        title="Editar viaje"
-        size="xl"
-      >
+      <Modal open={!!editViaje} onClose={() => setEditViaje(null)} title="Editar viaje" size="xl">
         {editViaje && (
           <ViajeForm
             initialData={editViaje as unknown as Record<string, unknown>}
@@ -275,7 +236,7 @@ export default function ViajesPage() {
         )}
       </Modal>
 
-      {/* Modal confirmar eliminación */}
+      {/* Modal eliminar */}
       <Modal
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
@@ -288,9 +249,7 @@ export default function ViajesPage() {
           </>
         }
       >
-        <p className="text-text-secondary text-sm">
-          ¿Estás seguro de que querés eliminar este viaje? Esta acción no se puede deshacer.
-        </p>
+        <p className="text-text-secondary text-sm">¿Eliminar este viaje? Esta acción no se puede deshacer.</p>
       </Modal>
     </div>
   )

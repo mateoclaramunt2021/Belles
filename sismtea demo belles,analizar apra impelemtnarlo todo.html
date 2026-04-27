@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransControl — Sistema de Gestión de Flota | Neuriax</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #0a0b10;
+  --surface: #12131a;
+  --surface2: #1a1b25;
+  --surface3: #22232f;
+  --border: #2a2b3a;
+  --border2: #3a3b4a;
+  --text: #e8e9f0;
+  --text2: #9a9bb0;
+  --text3: #6a6b80;
+  --accent: #00d4ff;
+  --accent2: #7c5fff;
+  --accent3: #00e89d;
+  --red: #ff4757;
+  --orange: #ffa502;
+  --gradient: linear-gradient(135deg, #00d4ff, #7c5fff);
+  --gradient2: linear-gradient(135deg, #00e89d, #00d4ff);
+}
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+
+/* Sidebar */
+.sidebar { position:fixed; left:0; top:0; bottom:0; width:240px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:100; }
+.sidebar-logo { padding:20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+.sidebar-logo img { height:32px; }
+.sidebar-logo span { font-size:11px; color:var(--accent); font-weight:500; letter-spacing:1px; text-transform:uppercase; }
+.sidebar-nav { padding:12px 0; flex:1; }
+.nav-section { padding:8px 20px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:1.5px; font-weight:600; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:10px 20px; color:var(--text2); cursor:pointer; transition:all .2s; font-size:13px; border-left:3px solid transparent; }
+.nav-item:hover { background:var(--surface2); color:var(--text); }
+.nav-item.active { background:rgba(0,212,255,.06); color:var(--accent); border-left-color:var(--accent); }
+.nav-item svg { width:18px; height:18px; opacity:.7; }
+.nav-item.active svg { opacity:1; }
+.sidebar-footer { padding:16px 20px; border-top:1px solid var(--border); font-size:11px; color:var(--text3); }
+
+/* Main */
+.main { margin-left:240px; min-height:100vh; }
+.topbar { height:56px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 28px; position:sticky; top:0; z-index:50; }
+.topbar-title { font-size:15px; font-weight:600; }
+.topbar-right { display:flex; align-items:center; gap:16px; }
+.topbar-badge { background:var(--accent); color:var(--bg); font-size:10px; font-weight:700; padding:3px 10px; border-radius:20px; }
+.topbar-user { width:32px; height:32px; border-radius:50%; background:var(--gradient); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+
+.content { padding:24px 28px; }
+
+/* KPI Cards */
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; position:relative; overflow:hidden; }
+.kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.kpi-card:nth-child(1)::before { background:var(--gradient); }
+.kpi-card:nth-child(2)::before { background:var(--gradient2); }
+.kpi-card:nth-child(3)::before { background:linear-gradient(135deg,var(--orange),var(--red)); }
+.kpi-card:nth-child(4)::before { background:linear-gradient(135deg,var(--accent2),#ff6b9d); }
+.kpi-label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-bottom:8px; }
+.kpi-value { font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; }
+.kpi-value.blue { color:var(--accent); }
+.kpi-value.green { color:var(--accent3); }
+.kpi-value.orange { color:var(--orange); }
+.kpi-value.purple { color:var(--accent2); }
+.kpi-sub { font-size:11px; color:var(--text3); margin-top:4px; font-family:'JetBrains Mono',monospace; }
+
+/* Filters */
+.filters-bar { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin-bottom:24px; }
+.filters-title { font-size:12px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.filters-title svg { width:14px; height:14px; color:var(--accent); }
+.filters-row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-group label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.filter-group select, .filter-group input { background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:8px; font-size:12px; font-family:'DM Sans',sans-serif; outline:none; min-width:150px; }
+.filter-group select:focus, .filter-group input:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,212,255,.15); }
+.filter-group select option { background:var(--surface2); }
+.btn { padding:8px 20px; border-radius:8px; border:none; font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; }
+.btn-primary { background:var(--gradient); color:var(--bg); }
+.btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+.btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--text2); color:var(--text); }
+
+/* Charts area */
+.charts-grid { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:24px; }
+.chart-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.chart-title { font-size:13px; font-weight:600; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+.chart-title span { font-size:10px; color:var(--text3); font-weight:400; }
+.chart-area { height:220px; position:relative; }
+
+/* Bar chart */
+.bar-chart { display:flex; align-items:end; gap:6px; height:100%; padding-top:20px; }
+.bar-group { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; justify-content:end; }
+.bar { width:100%; border-radius:4px 4px 0 0; min-height:4px; transition:all .5s cubic-bezier(.4,0,.2,1); position:relative; cursor:pointer; }
+.bar:hover { opacity:.8; }
+.bar.income { background:var(--gradient); }
+.bar.expense { background:linear-gradient(180deg,var(--red),#cc3344); }
+.bar-label { font-size:9px; color:var(--text3); font-family:'JetBrains Mono',monospace; writing-mode:vertical-rl; text-orientation:mixed; max-height:60px; overflow:hidden; }
+.bar-value { font-size:8px; color:var(--text2); font-family:'JetBrains Mono',monospace; position:absolute; top:-14px; left:50%; transform:translateX(-50%); white-space:nowrap; }
+
+/* Donut chart */
+.donut-container { display:flex; align-items:center; justify-content:center; height:100%; gap:20px; }
+.donut { width:160px; height:160px; border-radius:50%; position:relative; }
+.donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+.donut-center .val { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; color:var(--text); }
+.donut-center .lbl { font-size:10px; color:var(--text3); }
+.donut-legend { display:flex; flex-direction:column; gap:8px; }
+.legend-item { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text2); }
+.legend-dot { width:10px; height:10px; border-radius:3px; }
+
+/* Table */
+.table-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.table-header { padding:16px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+.table-header h3 { font-size:14px; font-weight:600; }
+.table-count { font-size:11px; color:var(--text3); font-family:'JetBrains Mono',monospace; }
+.table-scroll { overflow-x:auto; max-height:500px; overflow-y:auto; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead { position:sticky; top:0; z-index:2; }
+thead th { background:var(--surface2); padding:10px 14px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--text3); font-weight:600; border-bottom:1px solid var(--border); white-space:nowrap; }
+tbody td { padding:10px 14px; border-bottom:1px solid var(--border); white-space:nowrap; color:var(--text2); }
+tbody tr:hover { background:var(--surface2); }
+tbody tr:hover td { color:var(--text); }
+td.num { font-family:'JetBrains Mono',monospace; text-align:right; font-size:11px; }
+td.positive { color:var(--accent3); }
+td.negative { color:var(--red); }
+.matricula-badge { background:rgba(0,212,255,.1); color:var(--accent); padding:2px 8px; border-radius:4px; font-size:10px; font-family:'JetBrains Mono',monospace; font-weight:600; }
+
+/* Tabs */
+.tabs { display:flex; gap:0; margin-bottom:0; }
+.tab { padding:10px 20px; font-size:12px; font-weight:500; color:var(--text3); cursor:pointer; border-bottom:2px solid transparent; transition:all .2s; }
+.tab:hover { color:var(--text2); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+/* View sections */
+.view { display:none; }
+.view.active { display:block; }
+
+/* Animations */
+@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.animate { animation:fadeUp .5s ease both; }
+.animate-d1 { animation-delay:.1s; }
+.animate-d2 { animation-delay:.2s; }
+.animate-d3 { animation-delay:.3s; }
+.animate-d4 { animation-delay:.4s; }
+
+/* Export button */
+.btn-export { display:inline-flex; align-items:center; gap:6px; }
+.btn-export svg { width:14px; height:14px; }
+
+/* Responsive */
+@media(max-width:1200px) { .kpi-grid { grid-template-columns:repeat(2,1fr); } .charts-grid { grid-template-columns:1fr; } }
+@media(max-width:768px) { .sidebar { display:none; } .main { margin-left:0; } .kpi-grid { grid-template-columns:1fr; } .filters-row { flex-direction:column; } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--surface); }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--text3); }
+
+/* Tooltip */
+.tooltip { position:absolute; background:var(--surface3); border:1px solid var(--border2); padding:8px 12px; border-radius:8px; font-size:11px; pointer-events:none; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+
+/* Pulse dot */
+.pulse { width:8px; height:8px; border-radius:50%; background:var(--accent3); position:relative; }
+.pulse::after { content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--accent3); animation:pulse-ring 2s infinite; }
+@keyframes pulse-ring { 0% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.8); } }
+
+.status-bar { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--accent3); }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:200; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; width:95%; max-width:680px; max-height:90vh; overflow-y:auto; transform:translateY(30px) scale(.97); transition:transform .25s; }
+.modal-overlay.open .modal { transform:translateY(0) scale(1); }
+.modal-head { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.modal-head h2 { font-size:16px; font-weight:600; }
+.modal-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:22px; line-height:1; padding:4px; }
+.modal-close:hover { color:var(--red); }
+.modal-body { padding:20px 24px; }
+.modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.modal-grid.three { grid-template-columns:1fr 1fr 1fr; }
+.form-group { display:flex; flex-direction:column; gap:4px; }
+.form-group.full { grid-column:1/-1; }
+.form-group label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.form-group input, .form-group select { background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:8px; font-size:12px; font-family:'DM Sans',sans-serif; outline:none; width:100%; }
+.form-group input:focus, .form-group select:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,212,255,.15); }
+.form-group select option { background:var(--surface2); }
+.modal-foot { padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; }
+
+/* Action buttons */
+.btn { padding:8px 20px; border-radius:8px; border:none; font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; }
+.btn-primary { background:var(--gradient); color:var(--bg); }
+.btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+.btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--text2); color:var(--text); }
+.btn-danger { background:var(--red); color:#fff; }
+.btn-danger:hover { opacity:.85; }
+.btn-sm { padding:5px 12px; font-size:11px; border-radius:6px; }
+.btn-add { display:inline-flex; align-items:center; gap:6px; background:var(--gradient); color:var(--bg); padding:8px 18px; border-radius:8px; border:none; font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; }
+.btn-add:hover { opacity:.9; transform:translateY(-1px); }
+.btn-add svg { width:14px; height:14px; }
+
+/* Row actions */
+.row-actions { display:flex; gap:4px; }
+.row-btn { background:none; border:1px solid var(--border); color:var(--text3); cursor:pointer; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+.row-btn:hover { border-color:var(--accent); color:var(--accent); background:rgba(0,212,255,.06); }
+.row-btn.del:hover { border-color:var(--red); color:var(--red); background:rgba(255,71,87,.06); }
+.row-btn svg { width:13px; height:13px; }
+
+/* Confirm dialog */
+.confirm-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:300; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+.confirm-overlay.open { opacity:1; pointer-events:all; }
+.confirm-box { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px; max-width:380px; text-align:center; }
+.confirm-box h3 { font-size:15px; margin-bottom:8px; }
+.confirm-box p { font-size:12px; color:var(--text2); margin-bottom:20px; }
+.confirm-box .btns { display:flex; gap:10px; justify-content:center; }
+
+/* Toast */
+.toast { position:fixed; bottom:24px; right:24px; background:var(--accent3); color:var(--bg); padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600; z-index:400; transform:translateY(80px); opacity:0; transition:all .3s; }
+.toast.show { transform:translateY(0); opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAQABgADASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAAAAAAAAAcIAQIDBQYECf/EAFsQAQABAwMABQcDCxAGCQQDAAABAgMEBQYRBxIhMUEIE1FhcYGRFCIyFUJSYnSSobGys9IWFyMkMzY3U1Zyc3WClMHRGDRDY2SiJSY1RVRVZYSTJ0RGwoOj4f/EABsBAQACAwEBAAAAAAAAAAAAAAAFBgMEBwEC/8QAPBEBAAEDAgIFCgQFBAMBAAAAAAECAwQFESExBhJBUXETFCJhgZGhscHRMjRy8CM1QuHxFjNSkhUkJYL/2gAMAwEAAhEDEQA/ALlAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//2Q==" alt="Neuriax" style="height:30px;">
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" onclick="showView('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showView('viajes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Viajes
+    </div>
+    <div class="nav-item" onclick="showView('camiones')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      Camiones
+    </div>
+    <div class="nav-item" onclick="showView('choferes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Choferes
+    </div>
+    <div class="nav-section" style="margin-top:12px">Análisis</div>
+    <div class="nav-item" onclick="showView('reportes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Reportes
+    </div>
+    <div class="nav-item" onclick="showView('gasoil')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+      Gasoil
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status-bar"><div class="pulse"></div> Sistema activo</div>
+    <div style="margin-top:6px;font-size:10px;">Demo — Neuriax 2026</div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="pageTitle">Dashboard General</div>
+    <div class="topbar-right">
+      <div class="topbar-badge">DEMO</div>
+      <div class="topbar-user">ME</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- DASHBOARD VIEW -->
+    <div class="view active" id="view-dashboard">
+      <div class="kpi-grid">
+        <div class="kpi-card animate"><div class="kpi-label">Ingresos Totales</div><div class="kpi-value blue" id="kpi-income">—</div><div class="kpi-sub" id="kpi-income-sub"></div></div>
+        <div class="kpi-card animate animate-d1"><div class="kpi-label">Beneficio Neto</div><div class="kpi-value green" id="kpi-profit">—</div><div class="kpi-sub" id="kpi-profit-sub"></div></div>
+        <div class="kpi-card animate animate-d2"><div class="kpi-label">Total Viajes</div><div class="kpi-value orange" id="kpi-trips">—</div><div class="kpi-sub" id="kpi-trips-sub"></div></div>
+        <div class="kpi-card animate animate-d3"><div class="kpi-label">Gasto Gasoil</div><div class="kpi-value purple" id="kpi-gas">—</div><div class="kpi-sub" id="kpi-gas-sub"></div></div>
+      </div>
+
+      <div class="filters-bar animate animate-d2">
+        <div class="filters-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filtros</div>
+        <div class="filters-row">
+          <div class="filter-group"><label>Matrícula</label><select id="f-mat" onchange="applyFilters()"><option value="">Todas</option></select></div>
+          <div class="filter-group"><label>Chofer</label><select id="f-cho" onchange="applyFilters()"><option value="">Todos</option></select></div>
+          <div class="filter-group"><label>Cliente</label><select id="f-cli" onchange="applyFilters()"><option value="">Todos</option></select></div>
+          <div class="filter-group"><label>Desde</label><input type="date" id="f-from" onchange="applyFilters()"></div>
+          <div class="filter-group"><label>Hasta</label><input type="date" id="f-to" onchange="applyFilters()"></div>
+          <div class="filter-group" style="justify-content:end"><button class="btn btn-ghost" onclick="clearFilters()">Limpiar</button></div>
+        </div>
+      </div>
+
+      <div class="charts-grid animate animate-d3">
+        <div class="chart-card">
+          <div class="chart-title">Ingresos vs Gastos por Mes <span id="chart-period"></span></div>
+          <div class="chart-area" id="barChart"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Distribución por Camión</div>
+          <div class="chart-area">
+            <div class="donut-container">
+              <canvas id="donutCanvas" width="160" height="160"></canvas>
+              <div class="donut-legend" id="donutLegend"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card animate animate-d4">
+        <div class="table-header">
+          <h3>Últimos Viajes</h3>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="table-count" id="tableCount"></div>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>Fecha</th><th>Matrícula</th><th>Chofer</th><th>Cliente</th><th>Origen → Destino</th><th>Mercadería</th><th style="text-align:right">Importe</th><th style="text-align:right">Gasoil</th><th style="text-align:right">Beneficio</th>
+            </tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIAJES VIEW -->
+    <div class="view" id="view-viajes">
+      <div class="filters-bar">
+        <div class="filters-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Buscar Viajes</div>
+        <div class="filters-row">
+          <div class="filter-group"><label>Matrícula</label><select id="fv-mat" onchange="applyViajesFilter()"><option value="">Todas</option></select></div>
+          <div class="filter-group"><label>Chofer</label><select id="fv-cho" onchange="applyViajesFilter()"><option value="">Todos</option></select></div>
+          <div class="filter-group"><label>Cliente</label><select id="fv-cli" onchange="applyViajesFilter()"><option value="">Todos</option></select></div>
+          <div class="filter-group"><label>Mercadería</label><select id="fv-mer" onchange="applyViajesFilter()"><option value="">Todas</option></select></div>
+          <div class="filter-group"><label>Desde</label><input type="date" id="fv-from" onchange="applyViajesFilter()"></div>
+          <div class="filter-group"><label>Hasta</label><input type="date" id="fv-to" onchange="applyViajesFilter()"></div>
+          <div class="filter-group" style="justify-content:end"><button class="btn btn-ghost" onclick="clearViajesFilter()">Limpiar</button></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><h3>Todos los Viajes</h3><div style="display:flex;gap:12px;align-items:center"><div class="table-count" id="viajesCount"></div><button class="btn-add" onclick="openModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nuevo Viaje</button></div></div>
+        <div class="table-scroll" style="max-height:600px">
+          <table>
+            <thead><tr>
+              <th>Fecha</th><th>Matrícula</th><th>Remolque</th><th>Chofer</th><th>Cliente</th><th>Origen</th><th>Destino</th><th>Mercadería</th><th style="text-align:right">Km</th><th style="text-align:right">Tons</th><th style="text-align:right">Importe</th><th style="text-align:right">Gasoil</th><th style="text-align:right">Comisión</th><th style="text-align:right">Peajes</th><th style="text-align:right">Beneficio</th><th style="text-align:center">Acciones</th>
+            </tr></thead>
+            <tbody id="viajesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAMIONES VIEW -->
+    <div class="view" id="view-camiones">
+      <div class="kpi-grid" id="camionesKPI"></div>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr">
+        <div class="chart-card">
+          <div class="chart-title">Ingresos por Camión</div>
+          <div class="chart-area" id="camionesBarChart"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Consumo Gasoil por Camión (Litros)</div>
+          <div class="chart-area" id="camionesGasChart"></div>
+        </div>
+      </div>
+      <div class="table-card" style="margin-top:16px">
+        <div class="table-header"><h3>Detalle por Camión</h3></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Matrícula</th><th style="text-align:right">Viajes</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Gasoil</th><th style="text-align:right">Comisiones</th><th style="text-align:right">Peajes</th><th style="text-align:right">Beneficio</th><th style="text-align:right">Margen</th></tr></thead>
+            <tbody id="camionesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHOFERES VIEW -->
+    <div class="view" id="view-choferes">
+      <div class="table-card">
+        <div class="table-header"><h3>Rendimiento por Chofer</h3></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Chofer</th><th style="text-align:right">Viajes</th><th style="text-align:right">Ingresos Generados</th><th style="text-align:right">Gasoil Consumido</th><th style="text-align:right">Litros</th><th style="text-align:right">Comisiones</th><th style="text-align:right">Promedio/Viaje</th></tr></thead>
+            <tbody id="choferesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORTES VIEW -->
+    <div class="view" id="view-reportes">
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="chart-card">
+          <div class="chart-title">Top 10 Clientes por Ingresos</div>
+          <div id="topClients" style="padding:8px 0"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Top 10 Rutas más Frecuentes</div>
+          <div id="topRoutes" style="padding:8px 0"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Mercaderías Transportadas</div>
+          <div id="topMerc" style="padding:8px 0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GASOIL VIEW -->
+    <div class="view" id="view-gasoil">
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)" id="gasoilKPI"></div>
+      <div class="chart-card" style="margin-top:16px">
+        <div class="chart-title">Consumo de Gasoil por Mes</div>
+        <div class="chart-area" id="gasoilChart" style="height:250px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const RAW = [{"f":"2022-03-31","m":"FTP2558","cl":"Diego Romero","o":"Villa Lucero","d":"Saman Tbo","me":"Arroz","ch":"Pablo","km":100,"tn":29.47,"imp":18566.0,"gas":10798,"lt":200,"com":2000,"pj":0},{"f":"2022-04-06","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Pablo","km":500,"tn":31.77,"imp":34693.0,"gas":19066.0,"lt":323.2,"com":2700,"pj":1992},{"f":"2022-04-09","m":"RTP2596","cl":"Idalen SA","o":"Mangrullo","d":"Paco","me":"Pinos","ch":"Luis","km":6976,"tn":29.85,"imp":37462.0,"gas":22851.0,"lt":150.0,"com":3000,"pj":1992},{"f":"2022-04-14","m":"RTP2596","cl":"AF","o":"El Cerro","d":"Eucaliptus","me":"Pinos","ch":"Jefferson","km":364,"tn":31.49,"imp":32844.0,"gas":15789.0,"lt":267.7,"com":3000,"pj":1328},{"f":"2022-04-19","m":"FTP2637","cl":"Luis Mario Fros","o":"Agrifim","d":"Punta de 5 Sauce","me":"Fertilizante","ch":"Sebastian","km":512,"tn":20,"imp":34000,"gas":3936.0,"lt":66.7,"com":3000,"pj":0},{"f":"2022-04-23","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Pablo","km":500,"tn":31.51,"imp":34409.0,"gas":20566.0,"lt":348.6,"com":2700,"pj":1992},{"f":"2022-05-04","m":"FTP2558","cl":"Horizonte","o":"Hyundai","d":"Rivera","me":"Autos","ch":"Pablo","km":500,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2022-05-05","m":"FTP2560","cl":"TGL","o":"Buena Union","d":"Paco","me":"Pinos","ch":"Daniel Vignoli","km":495,"tn":31.59,"imp":38540.0,"gas":21363,"lt":344.6,"com":3000,"pj":1992},{"f":"2022-05-12","m":"FTP2560","cl":"TGL","o":"Buena Union","d":"Paco","me":"Pinos","ch":"Daniel Vignoli","km":495,"tn":31.43,"imp":38345.0,"gas":21028.0,"lt":339.2,"com":3000,"pj":1992},{"f":"2022-05-04","m":"FTP2559","cl":"Horizonte / Dolz","o":"A.Ramon / Lestido","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2022-05-20","m":"RTP2596","cl":"Gaucho","o":"Ajax","d":"Rivera","me":"Autos","ch":"Luis","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2022-05-20","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":32.4,"imp":35381.0,"gas":18286.0,"lt":295.0,"com":2750,"pj":1992},{"f":"2022-05-27","m":"FTP2559","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2022-05-31","m":"FTP2560","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Sebastian","km":0,"tn":3,"imp":12000,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2022-06-07","m":"FTP2637","cl":"Dolz / Chevrolet","o":"Volkswagen/Florida","d":"Rivera","me":"Autos","ch":"Sebastian","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2022-06-09","m":"FTP2559","cl":"Andres Latur","o":"Uam","d":"Tacuarembo","me":"Frutas","ch":"Adrian","km":0,"tn":281,"imp":7025,"gas":0,"lt":0,"com":562,"pj":0},{"f":"2022-06-13","m":"FTP2637","cl":"TGL","o":"Buena Union","d":"Rivera","me":"Pinos","ch":"Luis","km":0,"tn":29.89,"imp":36466.0,"gas":25176.0,"lt":287.4,"com":3000,"pj":1992},{"f":"2022-06-21","m":"RTP2596","cl":"TGL","o":"Buena Union","d":"Rivera","me":"Pinos","ch":"Luis","km":0,"tn":30.58,"imp":37308.0,"gas":37069.0,"lt":370.4,"com":3000,"pj":1992},{"f":"2022-06-27","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Marcos","km":500,"tn":31.94,"imp":35932.0,"gas":19717,"lt":303.4,"com":2500,"pj":1992},{"f":"2022-06-27","m":"FTP2558","cl":"TGL","o":"Buena Union","d":"TGL","me":"Pinos","ch":"Pablo","km":460,"tn":31.22,"imp":38084.0,"gas":26344.0,"lt":305.4,"com":3000,"pj":1992},{"f":"2022-07-08","m":"FTP2606","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jefferson","km":500,"tn":32.18,"imp":36202.0,"gas":24564.0,"lt":378.0,"com":2500,"pj":1992},{"f":"2022-07-13","m":"RTP2596","cl":"Frutifor","o":"Aserradero","d":"Ruta 5 Km 25.2","me":"Tablas","ch":"Luis","km":500,"tn":26.48,"imp":30000,"gas":15299.0,"lt":235.4,"com":2500,"pj":1992},{"f":"2022-07-11","m":"FTP2606","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jefferson","km":500,"tn":30.4,"imp":34200,"gas":26243,"lt":403.8,"com":2500,"pj":1992},{"f":"2022-07-22","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Marcos","km":500,"tn":32.48,"imp":36540,"gas":26192,"lt":303.0,"com":2500,"pj":1992},{"f":"2022-07-29","m":"RTP2596","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Luis","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2022-08-01","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.65,"imp":35606.0,"gas":20440,"lt":314.5,"com":2750,"pj":0},{"f":"2022-08-10","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Alex","km":500,"tn":31.43,"imp":35359.0,"gas":20108.0,"lt":309.4,"com":2500,"pj":1992},{"f":"2022-08-11","m":"FTP2606","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jefferson","km":500,"tn":30.41,"imp":34211.0,"gas":22762.0,"lt":150.1,"com":2500,"pj":1992},{"f":"2022-08-16","m":"RTP2596","cl":"TGL","o":"Buena Union","d":"TGL","me":"Pinos","ch":"Luis","km":0,"tn":30.37,"imp":37962.0,"gas":23695.0,"lt":259.6,"com":3000,"pj":1992},{"f":"2022-08-24","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.43,"imp":35359.0,"gas":19881,"lt":305.9,"com":2750,"pj":1992},{"f":"2022-08-31","m":"FTP2558","cl":"Berruti","o":"Barraca Maciel","d":"Ruta 27 km 66","me":"Racion","ch":"Adrian","km":0,"tn":28,"imp":23790,"gas":0,"lt":0,"com":2000,"pj":0},{"f":"2022-09-05","m":"FTP2606","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jefferson","km":500,"tn":31.25,"imp":35156.0,"gas":22847,"lt":351.6,"com":2500,"pj":2160},{"f":"2022-09-09","m":"RTP2596","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Luis","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2022-09-16","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Schandy","me":"Tablas","ch":"Gabriel","km":500,"tn":31.97,"imp":35966.0,"gas":20664.0,"lt":318.0,"com":2500,"pj":2160},{"f":"2022-09-16","m":"FTP2558","cl":"Urufor SA","o":"Cargo Nicolas","d":"La Punta","me":"Tablas","ch":"Adrian","km":500,"tn":32.46,"imp":36518.0,"gas":21562.0,"lt":331.8,"com":2750,"pj":2160},{"f":"2022-09-28","m":"RTP2596","cl":"Bernadro Pereira","o":"Ruta 8 km 27","d":"San Gregorio de Polanco","me":"Ticholos","ch":"Luis","km":0,"tn":0,"imp":16500,"gas":0,"lt":0,"com":1500,"pj":0},{"f":"2022-09-24","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jose","km":0,"tn":32.48,"imp":36540,"gas":25171.0,"lt":287.3,"com":2500,"pj":2160},{"f":"2022-10-05","m":"FTP2558","cl":"Chevrolet","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":8000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2022-10-06","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jose","km":0,"tn":31.87,"imp":35854.0,"gas":23961.0,"lt":318.7,"com":2500,"pj":2160},{"f":"2022-10-13","m":"FTP2558","cl":"Horizonte","o":"Rincolmar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2022-10-19","m":"FTP2560","cl":"PFU","o":"Sierra Verde (33)","d":"Cristofalo Mdeo","me":"Vietnam","ch":"Abraham","km":0,"tn":30.48,"imp":27737.0,"gas":18106.0,"lt":278.6,"com":3000,"pj":1440},{"f":"2022-10-22","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jose","km":0,"tn":32.01,"imp":36011.0,"gas":22689.0,"lt":349.1,"com":2500,"pj":2160},{"f":"2022-10-24","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.18,"imp":35078.0,"gas":20971,"lt":322.7,"com":2750,"pj":2160},{"f":"2022-10-29","m":"FTP2637","cl":"Automotora El Gaucho","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Jose","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2022-11-04","m":"FTP2558","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2022-11-10","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jose","km":500,"tn":32.54,"imp":36608.0,"gas":20927.0,"lt":322,"com":2500,"pj":2160},{"f":"2022-11-23","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.3,"imp":35212.0,"gas":21477.0,"lt":330.5,"com":2750,"pj":2160},{"f":"2022-11-29","m":"FTP2558","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2022-11-12","m":"FTP2560","cl":"Bernardo Pereira","o":"Rivera","d":"Ceramicas Castro","me":"Ladrillos","ch":"Jefferson","km":0,"tn":28,"imp":36000,"gas":24192.0,"lt":264.6,"com":2500,"pj":2160},{"f":"2022-12-02","m":"FTP3158","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Luis","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":300,"pj":0},{"f":"2022-12-09","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.27,"imp":35179.0,"gas":22256.0,"lt":342.4,"com":2750,"pj":2160},{"f":"2022-12-13","m":"FTP2559","cl":"RMG Ltda","o":"Montevideo","d":"Durazno","me":"Hierros","ch":"Gabriel","km":0,"tn":1,"imp":16470,"gas":0,"lt":0,"com":1200,"pj":0},{"f":"2022-12-21","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Plaza","me":"Tablas","ch":"Adrian","km":500,"tn":30.74,"imp":34582.0,"gas":22994.0,"lt":353.8,"com":2750,"pj":2160},{"f":"2022-12-28","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.89,"imp":35876.0,"gas":20082.0,"lt":321.3,"com":2500,"pj":2160},{"f":"2023-01-05","m":"FTP2637","cl":"Horizonte","o":"Polo Oeste y Fiancar","d":"Rivera","me":"Autos","ch":"Jefferson","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-01-09","m":"FTP2558","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":12000,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2023-01-11","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jefferson","km":500,"tn":32.44,"imp":36495,"gas":23247.0,"lt":394.1,"com":2500,"pj":2160},{"f":"2023-01-16","m":"FTP3172","cl":"TGL","o":"Buena Union","d":"TGL","me":"Pinos","ch":"Martin Barboza","km":500,"tn":30.13,"imp":33143,"gas":15451.0,"lt":261.9,"com":3000,"pj":2160},{"f":"2023-01-26","m":"FTP2558","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Nicolas","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2023-01-31","m":"FTP2560","cl":"TGL","o":"Clara","d":"TGL","me":"Pinos","ch":"Martin Barboza","km":350,"tn":31.34,"imp":29773,"gas":9054.0,"lt":153.5,"com":3000,"pj":1440},{"f":"2023-02-01","m":"FTP3172","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2023-02-07","m":"FTP2558","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2022-02-13","m":"FTP2558","cl":"Dolz","o":"Lestido","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":5000,"gas":0,"lt":0,"com":400,"pj":0},{"f":"2023-02-21","m":"FTP2558","cl":"Oscar Lopez","o":"UAM","d":"Rivera","me":"Frutas","ch":"Adrian","km":0,"tn":242,"imp":7744,"gas":0,"lt":0,"com":726,"pj":0},{"f":"2023-02-22","m":"FTP2560","cl":"TGL","o":"Clara","d":"TGL","me":"Pinos","ch":"Martin Barboza","km":350,"tn":29.88,"imp":28386,"gas":20568.0,"lt":158.7,"com":3000,"pj":1440},{"f":"2023-03-02","m":"FTP2560","cl":"Idalen SA","o":"Batovi","d":"Neladi SA","me":"Pinos","ch":"Martin Barboza","km":500,"tn":30.76,"imp":39065.0,"gas":17624,"lt":309.2,"com":3000,"pj":2160},{"f":"2023-03-07","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Gabriel","km":500,"tn":32.05,"imp":33973,"gas":19071.0,"lt":334.6,"com":2500,"pj":2160},{"f":"2023-03-08","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Jefferson","km":0,"tn":30.47,"imp":32298.0,"gas":19749.0,"lt":346.5,"com":2500,"pj":2160},{"f":"2023-03-20","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.68,"imp":33581.0,"gas":18770.0,"lt":329.4,"com":2500,"pj":2160},{"f":"2023-03-23","m":"FTP2637","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Franco Gorgoroso","km":0,"tn":1,"imp":4000,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2023-03-24","m":"FTP3158","cl":"Horizonte","o":"Fiancar","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":2,"imp":9000,"gas":8612.0,"lt":151.1,"com":700,"pj":0},{"f":"2023-04-03","m":"FTP2559","cl":"Obratel","o":"Ruta 1","d":"Caraguata","me":"Racion","ch":"Gabriel","km":0,"tn":0,"imp":34000,"gas":11398,"lt":200,"com":3000,"pj":0},{"f":"2023-04-06","m":"FTP3172","cl":"Idalen SA","o":"Batovi2","d":"Neladi SA","me":"Pinos","ch":"Jefferson","km":530,"tn":31.9,"imp":40513,"gas":25855.0,"lt":300.4,"com":2000,"pj":2160},{"f":"2023-04-06","m":"FTP3158","cl":"Idalen SA","o":"Batovi 2","d":"Neladi SA","me":"Pinos","ch":"Robert","km":536,"tn":29.92,"imp":37998.0,"gas":21669.0,"lt":248.6,"com":3000,"pj":2160},{"f":"2023-04-11","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.53,"imp":33422.0,"gas":18705.0,"lt":328.2,"com":2750,"pj":2160},{"f":"2023-04-19","m":"FTP2560","cl":"Obratel","o":"Myrin Cibils","d":"El Cerro","me":"Urea","ch":"Martin Barboza","km":530,"tn":29,"imp":34000,"gas":10653.0,"lt":186.9,"com":3000,"pj":0},{"f":"2023-04-17","m":"FTP2559","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2023-04-27","m":"FTP3158","cl":"Arboreal SA","o":"Arboreal","d":"Murchinson","me":"Tablas","ch":"Robert","km":380,"tn":26.43,"imp":30000,"gas":11765,"lt":206.4,"com":3000,"pj":2160},{"f":"2023-04-25","m":"FTP2560","cl":"TGL","o":"Monte Varela","d":"Paco","me":"Pinos","ch":"Martin Barboza","km":500,"tn":30.18,"imp":31689,"gas":24389.0,"lt":278.0,"com":3000,"pj":1440},{"f":"2023-05-09","m":"FTP2559","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":12000,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-05-11","m":"FTP3158","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Robert","km":500,"tn":31.61,"imp":33507.0,"gas":19118.0,"lt":335.5,"com":2500,"pj":2160},{"f":"2023-05-19","m":"FTP2558","cl":"Maxibloques","o":"Maxibloques","d":"Durazno","me":"Bloques","ch":"Adrian","km":190,"tn":22,"imp":16000,"gas":0,"lt":0,"com":1500,"pj":0},{"f":"2023-05-20","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Gabriel","km":500,"tn":31.58,"imp":33475.0,"gas":17325,"lt":304,"com":2800,"pj":2160},{"f":"2023-05-23","m":"FTP2560","cl":"Gerardo Juranovic","o":"La Calera","d":"Salinas","me":"3.30 Pino","ch":"Luis Ernesto","km":0,"tn":30.97,"imp":41810.0,"gas":21326.0,"lt":215.3,"com":3000,"pj":2160},{"f":"2023-05-29","m":"FTP2559","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-06-08","m":"FTP2558","cl":"Horizonte","o":"Polo Oeste","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2023-06-06","m":"FTP3158","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert/Nico","km":0,"tn":31.88,"imp":33793.0,"gas":17280,"lt":326.1,"com":2500,"pj":2160},{"f":"2023-06-09","m":"ITP2870","cl":"Puñales","o":"Nueva Carrara","d":"Tranqueras","me":"3.30 Pino","ch":"Freddy Rodriguez","km":51,"tn":27.95,"imp":15500,"gas":0,"lt":0,"com":1500,"pj":0},{"f":"2023-06-12","m":"FTP2560","cl":"Valentin Varela","o":"Monte Varela","d":"Las Piedras","me":"3.30 Pino","ch":"Luis Ernesto","km":0,"tn":29.7,"imp":34155,"gas":18650.0,"lt":352.0,"com":3000,"pj":2304},{"f":"2023-06-20","m":"FTP2558","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2023-06-24","m":"ITP2870","cl":"Puñales","o":"Tranqueras","d":"Maldonado","me":"Tablas T.","ch":"Freddy Rodriguez","km":608,"tn":30.5,"imp":38000,"gas":7706,"lt":145.4,"com":3000,"pj":3263},{"f":"2023-07-01","m":"FTP3158","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":32.24,"imp":32788.0,"gas":17899.0,"lt":338.5,"com":2500,"pj":2304},{"f":"2023-07-05","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":32.51,"imp":33063.0,"gas":14863.0,"lt":281.1,"com":2800,"pj":2304},{"f":"2023-07-03","m":"ITP2870","cl":"Puñales","o":"La Esperanza","d":"Maldonado","me":"3.30 Pino","ch":"Freddy Rodriguez","km":0,"tn":30.66,"imp":38000,"gas":13118.0,"lt":437.3,"com":3000,"pj":2304},{"f":"2023-07-12","m":"FTP2560","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Luis Ernesto","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2023-07-23","m":"FTP2560","cl":"Idalen SA","o":"Buena Union","d":"Neladi SA","me":"Pinos","ch":"Luis Ernesto","km":503,"tn":29.6,"imp":31376,"gas":26558.0,"lt":502.3,"com":3000,"pj":2304},{"f":"2023-07-25","m":"FTP3158","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Robert","km":500,"tn":31.84,"imp":32381.0,"gas":17290.0,"lt":327.0,"com":2500,"pj":2304},{"f":"2023-08-01","m":"FTP3158","cl":"Cooperativa Durazno","o":"Palencia y Maxi Bloques","d":"Durazno","me":"Isopaneles","ch":"Robert","km":0,"tn":0,"imp":20000,"gas":10572.0,"lt":200.0,"com":1500,"pj":0},{"f":"2023-08-02","m":"FTP2560","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Luis Ernesto","km":500,"tn":29.38,"imp":29879.0,"gas":19178.0,"lt":362.9,"com":2500,"pj":2304},{"f":"2023-08-08","m":"ITP2870","cl":"Rocco Constructora","o":"Maldonado","d":"Montevideo","me":"Andamios","ch":"Freddy Rodriguez","km":0,"tn":1,"imp":18300,"gas":9595.0,"lt":181.6,"com":1200,"pj":0},{"f":"2023-08-11","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.74,"imp":32280.0,"gas":13605.0,"lt":257.4,"com":2800,"pj":2304},{"f":"2023-08-17","m":"FTP2560","cl":"Horizonte","o":"Ricolmar","d":"Rivera","me":"Autos","ch":"Luis Ernesto","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-08-28","m":"FTP3158","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":31.41,"imp":31944.0,"gas":17991.0,"lt":340.4,"com":2500,"pj":2304},{"f":"2023-08-31","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":32.17,"imp":32717.0,"gas":17077,"lt":305,"com":2800,"pj":2304},{"f":"2023-09-07","m":"FTP2560","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Luis Ernesto","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":0,"pj":0},{"f":"2023-09-15","m":"FTP2637","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Franco Gorgoroso","km":500,"tn":31.37,"imp":31903.0,"gas":13959.0,"lt":249.3,"com":2500,"pj":2304},{"f":"2023-09-12","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.13,"imp":31659.0,"gas":18162,"lt":324.4,"com":2750,"pj":2304},{"f":"2023-09-18","m":"FTP2559","cl":"Chevrolet Florida","o":"Sarandi Grande","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":12540,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-09-28","m":"FTP2560","cl":"Aeropuerto Rivera - Puertas del Sur","o":"Maxibloques","d":"Aeropuerto Rivera","me":"Bloques","ch":"Luis Ernesto","km":0,"tn":0,"imp":34160,"gas":0,"lt":0,"com":2500,"pj":0},{"f":"2023-09-28","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.27,"imp":32521.0,"gas":19216.0,"lt":343.2,"com":2750,"pj":2304},{"f":"2023-09-28","m":"FTP3158","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":30.11,"imp":31314.0,"gas":17974.0,"lt":321.0,"com":2500,"pj":2304},{"f":"2023-10-13","m":"ITP2870","cl":"Puñales","o":"Tranqueras","d":"Atlandtida","me":"Tablas","ch":"Nicolas Modernel","km":500,"tn":30.27,"imp":40260,"gas":14360,"lt":241.8,"com":2500,"pj":2304},{"f":"2023-10-11","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.48,"imp":32739.0,"gas":19599.0,"lt":330,"com":2800,"pj":2304},{"f":"2023-10-09","m":"FTP2560","cl":"Puñales","o":"Tranqueras","d":"Maldonado","me":"Tablas","ch":"Luis Ernesto","km":0,"tn":30.78,"imp":38000,"gas":24623.0,"lt":414.6,"com":2500,"pj":2304},{"f":"2023-10-26","m":"ITP2870","cl":"Puñales","o":"Tranqueras","d":"Mercedes","me":"Tablas","ch":"Nicolas Modernel","km":500,"tn":31.86,"imp":38000,"gas":18480,"lt":311.2,"com":3000,"pj":3072},{"f":"2023-10-31","m":"FTP2558","cl":"Camilo Arizaga","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":8800,"gas":0,"lt":0,"com":900,"pj":0},{"f":"2023-11-02","m":"ITP2870","cl":"Piola","o":"Alfredo Ramón","d":"Rivera","me":"Autos","ch":"Nicolas Modernel","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2023-11-07","m":"FTP2558","cl":"Horizonte","o":"Ayax","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":11000,"gas":0,"lt":0,"com":900,"pj":0},{"f":"2023-11-16","m":"FTP2559","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-11-16","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":30.68,"imp":31907.0,"gas":20681.0,"lt":348.2,"com":2800,"pj":2304},{"f":"2023-11-20","m":"ITP2870","cl":"Sere y Cia","o":"Rilcomar","d":"Durazno","me":"Autos","ch":"Nicolas Modernel","km":200,"tn":3,"imp":12261,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-12-04","m":"FTP3158","cl":"Ciemsa SA","o":"Maxibloques","d":"Artigas","me":"Bloques","ch":"Robert","km":580,"tn":25.6,"imp":43920,"gas":17744.0,"lt":309.2,"com":2500,"pj":0},{"f":"2023-12-06","m":"FTP2560","cl":"Chevrolet Florida","o":"Chacra Belles","d":"Florida","me":"Autos","ch":"Ricardo Garcia","km":0,"tn":3,"imp":15000,"gas":0,"lt":0,"com":1250,"pj":2304},{"f":"2023-12-04","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":32.54,"imp":34167,"gas":17950.0,"lt":312.8,"com":2800,"pj":2304},{"f":"2023-12-04","m":"FTP2559","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2023-12-14","m":"ITP2870","cl":"Horizonte","o":"Ricolmar","d":"Rivera","me":"Autos","ch":"Nicolas Modernel","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2023-12-12","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.6,"imp":33180,"gas":18138.0,"lt":316.0,"com":2800,"pj":2304},{"f":"2023-12-16","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Matias Martinez","km":500,"tn":30.25,"imp":31762.0,"gas":23333.0,"lt":406.6,"com":2500,"pj":2304},{"f":"2023-12-28","m":"FTP2559","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-01-04","m":"FTP2560","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":31.1,"imp":32655,"gas":19279,"lt":348.1,"com":2500,"pj":2398.0},{"f":"2024-01-02","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":500,"tn":31.84,"imp":33432,"gas":19741.0,"lt":306.4,"com":2800,"pj":2398.0},{"f":"2024-01-12","m":"FTP2560","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":30.91,"imp":32456.0,"gas":18504.0,"lt":334.1,"com":2500,"pj":2398.0},{"f":"2024-01-13","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":500,"tn":31.3,"imp":32865,"gas":18040,"lt":325.7,"com":2800,"pj":2398.0},{"f":"2024-01-19","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.93,"imp":33526.0,"gas":18500,"lt":334,"com":2800,"pj":2398.0},{"f":"2024-01-19","m":"FTP2559","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-01-27","m":"FTP2558","cl":"Joaquin Curi","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":3950,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2024-01-27","m":"FTP3158","cl":"Mauricio Rodriguez","o":"Fymnsa","d":"Cardona","me":"Leña mt","ch":"Matias Martinez","km":0,"tn":27.8,"imp":40310,"gas":10472,"lt":189.1,"com":3500,"pj":1599.0},{"f":"2024-01-31","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Marcos","km":0,"tn":30.59,"imp":32120.0,"gas":20834.0,"lt":386.6,"com":2500,"pj":2398.0},{"f":"2024-01-29","m":"ITP2870","cl":"Luis Fros","o":"Isusa / Dapama","d":"El Tacuru","me":"Fertilizante","ch":"Nicolas Modernel","km":0,"tn":30.01,"imp":38000,"gas":24278.0,"lt":438.3,"com":3000,"pj":2460},{"f":"2024-02-05","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":32.4,"imp":34020,"gas":16440.0,"lt":305.1,"com":2800,"pj":2397},{"f":"2024-02-15","m":"ITP2870","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Adrian","km":500,"tn":27.9,"imp":38000,"gas":21011.0,"lt":389.9,"com":2800,"pj":2548.0},{"f":"2024-02-22","m":"ITP2870","cl":"Dolz","o":"Lestido","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":12200,"gas":0,"lt":0,"com":900,"pj":0},{"f":"2024-02-14","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.56,"imp":33138,"gas":18347.0,"lt":340.5,"com":2800,"pj":2397},{"f":"2024-02-24","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Ricardo Garcia","km":0,"tn":30.6,"imp":32130,"gas":18757,"lt":348.1,"com":2500,"pj":2398.0},{"f":"2024-02-28","m":"FTP2560","cl":"Automotora El Gaucho","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Marcos","km":0,"tn":2,"imp":10980,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-03-04","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":32.34,"imp":33957,"gas":18741.0,"lt":341.4,"com":2800,"pj":2397},{"f":"2024-03-05","m":"FTP3158","cl":"Ciemsa SA","o":"Maxibloques","d":"Rivera","me":"Bloques","ch":"Matias Martinez","km":0,"tn":0,"imp":34160,"gas":10848.0,"lt":197.6,"com":2500,"pj":0},{"f":"2024-03-11","m":"FTP2637","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Matias Martinez","km":500,"tn":0,"imp":38000,"gas":23037.0,"lt":269.7,"com":2800,"pj":2398.0},{"f":"2024-03-08","m":"FTP2559","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-03-19","m":"FTP2637","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Martin Barboza","km":500,"tn":0,"imp":38000,"gas":16993.0,"lt":309.6,"com":2800,"pj":2398.0},{"f":"2024-03-25","m":"ITP2870","cl":"Dutra","o":"alfredo Ramon","d":"Rivera","me":"Autos","ch":"Ricardo Garcia","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-03-22","m":"FTP2558","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":900,"pj":0},{"f":"2024-03-27","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":31.5,"imp":33075,"gas":17403.0,"lt":317.1,"com":2500,"pj":2398.0},{"f":"2024-04-05","m":"ITP2870","cl":"Automotora El Gaucho","o":"Ajax","d":"Rivera","me":"Autos","ch":"Ricardo Garcia","km":0,"tn":2,"imp":10980,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-04-11","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":31.04,"imp":32592,"gas":18352.0,"lt":334.4,"com":2500,"pj":2398.0},{"f":"2024-04-08","m":"ITP2870","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Ricardo Garcia","km":500,"tn":23.7,"imp":38000,"gas":17178.0,"lt":312.9,"com":2800,"pj":2548.0},{"f":"2024-04-01","m":"FTP2559","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":14274,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-04-17","m":"FTP2560","cl":"Piola","o":"Montevideo","d":"Rivera","me":"Autos","ch":"Daniel Lopez","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-04-19","m":"FTP2560","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Daniel Lopez","km":0,"tn":30.08,"imp":31584,"gas":19187.0,"lt":349.6,"com":2800,"pj":2398.0},{"f":"2024-04-24","m":"FTP2637","cl":"Charles","o":"Montevideo","d":"Rivera","me":"Autos","ch":"Martin Barboza","km":0,"tn":3,"imp":15000,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-04-26","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":32.19,"imp":33800.0,"gas":17105.0,"lt":311.6,"com":2800,"pj":2397},{"f":"2024-05-03","m":"ITP2870","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Ricardo Garcia","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-05-06","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":30.63,"imp":32162.0,"gas":17711.0,"lt":328.5,"com":2800,"pj":2397},{"f":"2024-05-04","m":"FTP3158","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Matias Martinez","km":500,"tn":20.01,"imp":38000,"gas":17806.0,"lt":330.2,"com":2800,"pj":2397},{"f":"2024-05-10","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":31.56,"imp":33138,"gas":18490.0,"lt":342.9,"com":2800,"pj":2398.0},{"f":"2024-05-23","m":"ATP3387","cl":"Horizonte","o":"Montevideo","d":"Rivera","me":"Autos","ch":"Martin Barboza","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-05-20","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.43,"imp":33002.0,"gas":19233.0,"lt":356.9,"com":2800,"pj":2397},{"f":"2024-05-21","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":31.01,"imp":32560.0,"gas":23886.0,"lt":414.2,"com":2800,"pj":2398.0},{"f":"2024-05-30","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":500,"tn":31.25,"imp":32812.0,"gas":16651,"lt":308.8,"com":2800,"pj":2397},{"f":"2024-06-03","m":"FTP3158","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Matias Martinez","km":500,"tn":21.71,"imp":38000,"gas":17334.0,"lt":330.7,"com":2800,"pj":2397},{"f":"2024-06-10","m":"FTP3172","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":3,"imp":14603.0,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-06-10","m":"FTP2558","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":14640,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2024-06-12","m":"FTP3172","cl":"Automotora El Gaucho","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":0,"imp":5490,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-06-15","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":32.5,"imp":34125,"gas":18032.0,"lt":344,"com":2800,"pj":2397},{"f":"2024-06-10","m":"FTP3158","cl":"Altercargo SRL","o":"Kluntex Tranqueras","d":"Murchinson","me":"Tablas","ch":"Matias Martinez","km":500,"tn":24.74,"imp":38000,"gas":0,"lt":0,"com":2800,"pj":2397},{"f":"2024-06-26","m":"FTP2637","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Martin Barboza","km":500,"tn":24.22,"imp":38000,"gas":17593.0,"lt":335.6,"com":2800,"pj":2397},{"f":"2024-06-19","m":"ATP3387","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Jose Cuña","km":500,"tn":22.46,"imp":38000,"gas":16899,"lt":222.4,"com":2800,"pj":2397},{"f":"2024-07-04","m":"FTP3158","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Ricardo Garcia","km":500,"tn":22.38,"imp":38000,"gas":20186.0,"lt":385.1,"com":2800,"pj":2397},{"f":"2024-07-05","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":30.53,"imp":32056.0,"gas":17815.0,"lt":339.9,"com":2800,"pj":2397},{"f":"2024-07-06","m":"ITP2870","cl":"Larratea","o":"Montevideo","d":"Rivera","me":"Autos","ch":"Alejandro","km":0,"tn":0,"imp":6000,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-07-13","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.53,"imp":33106.0,"gas":16250,"lt":310,"com":2800,"pj":2397},{"f":"2024-07-17","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Schandy","me":"Tablas","ch":"Robert","km":500,"tn":31.39,"imp":32960.0,"gas":17580.0,"lt":335.4,"com":2800,"pj":2397},{"f":"2024-07-23","m":"FTP2558","cl":"Ciemsa SA","o":"Bromyros","d":"Rivera","me":"Materiales varios","ch":"Adrian","km":0,"tn":0,"imp":34160,"gas":0,"lt":0,"com":2000,"pj":0},{"f":"2024-07-23","m":"FTP3158","cl":"Automotora El Gaucho","o":"Ayax","d":"Rivera","me":"Autos","ch":"Ricardo Garcia","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-07-26","m":"FTP3172","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Fernando","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-08-02","m":"FTP2637","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Martin Barboza","km":0,"tn":2,"imp":10980,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-08-06","m":"FTP2560","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Fernando","km":500,"tn":22.8,"imp":38000,"gas":18167.0,"lt":346.6,"com":2800,"pj":2397},{"f":"2024-08-08","m":"FTP3172","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-08-05","m":"FTP3158","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Ricardo Garcia","km":500,"tn":0,"imp":38000,"gas":11660.0,"lt":222.4,"com":2800,"pj":2397},{"f":"2024-08-12","m":"FTP3172","cl":"Conti","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-08-10","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":0,"tn":31.23,"imp":32792.0,"gas":18660.0,"lt":356.0,"com":2800,"pj":2397},{"f":"2024-08-13","m":"FTP2637","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Martin Barboza","km":500,"tn":0,"imp":38000,"gas":19080.0,"lt":364.0,"com":2800,"pj":2397},{"f":"2024-08-20","m":"ITP2870","cl":"Altercargo SRL","o":"Kluntex Tranqueras","d":"Murchinson","me":"Tablas","ch":"Joaquin Dos Santos","km":480,"tn":25.49,"imp":38000,"gas":15550.0,"lt":296.8,"com":2800,"pj":2548.0},{"f":"2024-08-29","m":"FTP2637","cl":"Horizonte","o":"Montevideo","d":"Rivera","me":"Autos","ch":"Martin Barboza","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-08-21","m":"FTP2558","cl":"Camilo Arizaga","o":"Fiancar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4095,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2024-09-03","m":"FTP3172","cl":"Automotora El Gaucho","o":"Ayax","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-09-03","m":"FTP3336","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Jose Cuña","km":500,"tn":24.84,"imp":38000,"gas":14027.0,"lt":163.8,"com":2800,"pj":2397},{"f":"2024-09-03","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":0,"tn":31.62,"imp":33201,"gas":16264.0,"lt":310.3,"com":2800,"pj":2397},{"f":"2024-09-11","m":"FTP3336","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Giovani Dutra","km":500,"tn":24.12,"imp":38000,"gas":18369.0,"lt":150.7,"com":2800,"pj":2397},{"f":"2024-09-14","m":"FTP3158","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Giovani Dutra","km":500,"tn":25.13,"imp":38000,"gas":17689.0,"lt":337.4,"com":2800,"pj":2397},{"f":"2024-09-13","m":"ITP2870","cl":"Altercargo SRL","o":"Kluntex Tranqueras","d":"Murchinson","me":"Tablas","ch":"Joaquin Dos Santos","km":480,"tn":24.88,"imp":38000,"gas":15923.0,"lt":303.8,"com":2800,"pj":2548.0},{"f":"2024-09-19","m":"FTP2558","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2024-09-18","m":"FTP3172","cl":"","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-09-24","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.41,"imp":32980.0,"gas":17117.0,"lt":326.5,"com":2800,"pj":2397},{"f":"2024-10-01","m":"FTP2560","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Fernando","km":500,"tn":0,"imp":38000,"gas":15813,"lt":316.8,"com":2800,"pj":2397},{"f":"2024-09-27","m":"ITP2870","cl":"Altercargo SRL","o":"Kluntex Tranqueras","d":"Murchinson","me":"Tablas","ch":"Joaquin Dos Santos","km":480,"tn":25.17,"imp":38000,"gas":12193,"lt":232.6,"com":2800,"pj":2548.0},{"f":"2024-10-10","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":30.89,"imp":32434.0,"gas":16124,"lt":323,"com":2800,"pj":2397},{"f":"2024-10-10","m":"FTP2560","cl":"Altercargo SRL","o":"Kluntex Tranqueras","d":"Murchinson","me":"Tablas","ch":"Fernando","km":500,"tn":25,"imp":38000,"gas":15316,"lt":306.8,"com":2800,"pj":2397},{"f":"2024-10-14","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31.21,"imp":32770.0,"gas":14777,"lt":296.0,"com":2800,"pj":2397},{"f":"2024-09-18","m":"FTP3370","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":3,"imp":13500,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-10-24","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Ricardo Garcia","km":500,"tn":31.93,"imp":33526.0,"gas":16992,"lt":340.4,"com":2800,"pj":2397},{"f":"2024-10-18","m":"FTP3172","cl":"Horizonte","o":"Fiancar","d":"Rivera","me":"Autos","ch":"Lucas Matheus","km":0,"tn":2,"imp":10980,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-10-24","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":500,"tn":30.51,"imp":32036.0,"gas":15276,"lt":306,"com":2800,"pj":2397},{"f":"2024-10-30","m":"FTP3336","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Giovani Dutra","km":500,"tn":25.45,"imp":38000,"gas":16249,"lt":325.5,"com":2800,"pj":2397},{"f":"2024-11-05","m":"FTP2560","cl":"Dario Ferraz","o":"Urusal","d":"Rivera","me":"Sal","ch":"Fernando","km":0,"tn":0,"imp":20000,"gas":0,"lt":0,"com":2500,"pj":0},{"f":"2024-11-12","m":"FTP2558","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":15738,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2024-11-11","m":"FTP2637","cl":"Altercargo SRL","o":"Kluntex Rivera","d":"Murchinson","me":"Tablas","ch":"Jose Cuña","km":500,"tn":23.97,"imp":38000,"gas":15679,"lt":314.1,"com":2800,"pj":2397},{"f":"2024-11-08","m":"FTP2559","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":15372,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-11-21","m":"FTP2560","cl":"Altercargo SRL","o":"Kluntex Tranqueras","d":"Cambre Pose","me":"Tablas","ch":"Fernando","km":500,"tn":0,"imp":38000,"gas":17668,"lt":353.9,"com":2800,"pj":2397},{"f":"2024-11-25","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":32.25,"imp":33862.0,"gas":15725,"lt":315,"com":2800,"pj":2397},{"f":"2024-11-29","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":29.61,"imp":31090.0,"gas":15269,"lt":305.9,"com":2800,"pj":2397},{"f":"2024-12-03","m":"FTP2558","cl":"Horizonte","o":"Fiancar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2024-12-02","m":"FTP2637","cl":"Horizonte","o":"Fiancar","d":"Rivera","me":"Autos","ch":"Jose Cuña","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2024-12-03","m":"FTP3370","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2024-12-10","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.31,"imp":32876.0,"gas":15822.0,"lt":316.9,"com":2800,"pj":2397},{"f":"2024-12-14","m":"FTP3158","cl":"Kluntex SA","o":"Kluntex Rivera","d":"Polo Oeste","me":"Tablas","ch":"Ricardo Garcia","km":500,"tn":25.36,"imp":38000,"gas":16269.0,"lt":325.9,"com":2800,"pj":2397},{"f":"2024-12-17","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.99,"imp":33590.0,"gas":15088.0,"lt":302.2,"com":2800,"pj":2397},{"f":"2024-12-17","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":31,"imp":32550,"gas":18948,"lt":379.6,"com":2800,"pj":2397},{"f":"2024-12-06","m":"FTP3336","cl":"Cebola","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Giovani Dutra","km":0,"tn":0,"imp":10700,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2024-12-23","m":"FTP3158","cl":"Kluntex SA","o":"Kluntex Rivera","d":"SAN JOSE","me":"Tablas","ch":"Ricardo Garcia","km":500,"tn":28.15,"imp":38000,"gas":18416.0,"lt":358.3,"com":2800,"pj":2397},{"f":"2025-01-07","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.74,"imp":33327,"gas":15464.0,"lt":309.8,"com":2800,"pj":2397},{"f":"2025-01-07","m":"FTP3158","cl":"Horizonte","o":"P.Oeste/A.Ramon","d":"Rivera","me":"Autos","ch":"Fernando","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-01-08","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Gabriel","km":0,"tn":31.84,"imp":33432,"gas":16054.0,"lt":321.6,"com":2800,"pj":2397},{"f":"2025-01-17","m":"FTP3158","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Fernando","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2025-01-22","m":"FTP3336","cl":"Camilo Arizaga","o":"Montevideo","d":"Rivera","me":"Autos","ch":"Giovani Dutra","km":0,"tn":0,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2025-01-25","m":"FTP3370","cl":"Zaballa","o":"Florida","d":"Rivera","me":"Autos","ch":"Fernando","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2025-02-04","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Gabriel","km":0,"tn":31.5,"imp":33075,"gas":17166.0,"lt":337.1,"com":2800,"pj":2397},{"f":"2025-02-05","m":"FTP2558","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":15921,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2025-02-11","m":"FTP2637","cl":"Ciemsa SA","o":"Montevideo","d":"Paysandú","me":"Isopaneles","ch":"Lucas Matheus","km":0,"tn":0,"imp":35000,"gas":9049,"lt":177.7,"com":2000,"pj":0},{"f":"2025-02-17","m":"FTP3172","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Fernando","km":0,"tn":31.94,"imp":33537,"gas":17217.0,"lt":338.1,"com":2800,"pj":3288.0},{"f":"2025-02-24","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"Plaza","me":"Tablas","ch":"Gabriel","km":500,"tn":31.51,"imp":33086.0,"gas":17585.0,"lt":345.3,"com":2800,"pj":3288.0},{"f":"2025-02-21","m":"FTP2558","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2025-03-05","m":"FTP3158","cl":"Charles","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":2,"imp":10000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2025-03-20","m":"FTP2558","cl":"Cujo","o":"Joaquin Suarez/Canelones","d":"Artigas","me":"Block","ch":"Adrian","km":0,"tn":0,"imp":33000,"gas":0,"lt":0,"com":2800,"pj":0},{"f":"2025-03-21","m":"FTP3370","cl":"Cliente varios","o":"Alfredo Ramon","d":"Rivera","me":"Camion chocado","ch":"Robert","km":0,"tn":0,"imp":35000,"gas":0,"lt":0,"com":1500,"pj":0},{"f":"2025-03-22","m":"FTP2637","cl":"Zaballa","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Fernando","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-04-01","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":0,"tn":31.53,"imp":33106.0,"gas":15738.0,"lt":313.7,"com":2800,"pj":3288.0},{"f":"2025-04-04","m":"FTP3158","cl":"Adecoagro","o":"Ansina","d":"Arroz del Plata Melo","me":"Arroz","ch":"Joaquin Dos Santos","km":0,"tn":27.79,"imp":27429.0,"gas":5908,"lt":117.8,"com":0,"pj":0},{"f":"2025-04-02","m":"FTP3448","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.5,"imp":33075,"gas":14284.0,"lt":284.7,"com":2800,"pj":3288.0},{"f":"2025-04-03","m":"FTP3370","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-04-14","m":"FTP3448","cl":"Nicolas Berruti","o":"Sarandi Grande","d":"5 Sauce","me":"Sembradora","ch":"Gabriel","km":0,"tn":0,"imp":35700,"gas":0,"lt":0,"com":2000,"pj":0},{"f":"2025-04-23","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Gabriel","km":0,"tn":31.2,"imp":32760,"gas":16185.0,"lt":322.6,"com":2800,"pj":3288.0},{"f":"2025-04-22","m":"FTP3448","cl":"HDM Transportes SRL","o":"Santa Maria","d":"Agrocopio","me":"Soja","ch":"Mauricio","km":341,"tn":30.44,"imp":58605.0,"gas":2508.0,"lt":50,"com":2800,"pj":0},{"f":"2025-04-24","m":"FTP2558","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":0,"tn":31.08,"imp":32634,"gas":15215.0,"lt":303.3,"com":2800,"pj":3288.0},{"f":"2025-04-21","m":"FTP3158","cl":"Adecoagro","o":"Ansina","d":"Arroz del Plata Melo","me":"Arroz","ch":"Joaquin Dos Santos","km":190,"tn":27.34,"imp":26985.0,"gas":11237,"lt":224.0,"com":0,"pj":0},{"f":"2025-04-29","m":"FTP3172","cl":"Nicolas Berruti","o":"Grupo RAS","d":"La Distancia","me":"Fertilizante","ch":"Lucas Matheus","km":520,"tn":26.85,"imp":35000,"gas":0,"lt":0,"com":0,"pj":0},{"f":"2025-05-08","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":32.81,"imp":34450.0,"gas":17479.0,"lt":326.4,"com":2800,"pj":3288.0},{"f":"2025-05-16","m":"FTP2558","cl":"Zaballa","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2025-05-12","m":"FTP3370","cl":"Dutra","o":"Florida","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2025-05-22","m":"FTP2558","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":2,"imp":10980,"gas":0,"lt":0,"com":900,"pj":0},{"f":"2025-05-29","m":"FTP3370","cl":"Horizonte","o":"Ril/Hyundai","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-06-03","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.24,"imp":32802,"gas":15533.0,"lt":330.3,"com":2800,"pj":3288.0},{"f":"2025-06-02","m":"FTP2558","cl":"Chico Rey","o":"Banco de seguros","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2025-06-05","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":30.99,"imp":32540.0,"gas":17574.0,"lt":373.7,"com":2800,"pj":3288.0},{"f":"2025-06-23","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Robert","km":500,"tn":32.03,"imp":33632.0,"gas":18373.0,"lt":390.6,"com":2800,"pj":3288.0},{"f":"2025-06-24","m":"FTP3556","cl":"Dolz","o":"Lestido","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":18300,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-07-07","m":"FTP3370","cl":"Chevrolet Florida","o":"Durazno","d":"Rivera","me":"Autos","ch":"Robert","km":0,"tn":3,"imp":10800,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-07-05","m":"FTP3556","cl":"Dutra","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":2,"imp":9000,"gas":0,"lt":0,"com":700,"pj":0},{"f":"2025-07-23","m":"FTP3556","cl":"Conti","o":"Conaprole","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2025-08-02","m":"FTP3556","cl":"","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2025-07-25","m":"FTP3448","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2025-08-11","m":"FTP3556","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":3,"imp":14640,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-08-13","m":"FTP2558","cl":"Charles","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2025-09-02","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Adrian","km":500,"tn":31.45,"imp":33022.0,"gas":23549,"lt":469.7,"com":2800,"pj":2454},{"f":"2025-08-29","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":30.88,"imp":32424,"gas":19264,"lt":400.7,"com":2800,"pj":2454},{"f":"2025-08-26","m":"FTP3172","cl":"Mauricio Cancela","o":"Arboreal","d":"Jose Ignacio","me":"Tablas","ch":"Lucas Matheus","km":520,"tn":30,"imp":54900,"gas":20479.0,"lt":425.9,"com":3000,"pj":3272},{"f":"2025-09-17","m":"FTP3556","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":350,"pj":0},{"f":"2025-09-09","m":"FTP3172","cl":"Cujo","o":"Atenko","d":"Rivera","me":"Hierros","ch":"Lucas Matheus","km":500,"tn":0,"imp":40260,"gas":0,"lt":0,"com":2800,"pj":0},{"f":"2025-09-24","m":"FTP2559","cl":"Gruas Reino","o":"Murchinson","d":"Rivera","me":"Contendedor","ch":"Miguel Yunu","km":0,"tn":0,"imp":18000,"gas":0,"lt":0,"com":1200,"pj":0},{"f":"2025-09-19","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Adrian","km":500,"tn":30.51,"imp":32036.0,"gas":17230,"lt":343.6,"com":2800,"pj":2454},{"f":"2025-10-03","m":"FTP3370","cl":"","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4500,"gas":0,"lt":0,"com":450,"pj":0},{"f":"2025-09-11","m":"FTP2560","cl":"Lumin","o":"La Toca","d":"Neladi","me":"Pino","ch":"Gonzalo","km":0,"tn":28.32,"imp":37439.0,"gas":17174,"lt":342.5,"com":3000,"pj":0},{"f":"2025-10-15","m":"FTP2560","cl":"Horizonte","o":"Murchinson","d":"Rivera","me":"Autos","ch":"Gonzalo","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-10-07","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.99,"imp":33590.0,"gas":17056,"lt":340.2,"com":2800,"pj":2454},{"f":"2025-10-06","m":"FTP3172","cl":"Horizonte","o":"Murchinson","d":"Rivera","me":"Autos","ch":"Lucas Matheus","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-10-23","m":"FTP3448","cl":"Urufor SA","o":"Urufor","d":"La Punta","me":"Tablas","ch":"Lucas Matheus","km":500,"tn":31.3,"imp":32865,"gas":15984,"lt":318.8,"com":2800,"pj":2454},{"f":"2025-10-30","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.39,"imp":32960.0,"gas":16049,"lt":320.1,"com":2800,"pj":2454},{"f":"2025-11-04","m":"FTP2559","cl":"Bernando Pereira","o":"Pilanor","d":"Tacuarembo","me":"Block","ch":"Miguel Yunu","km":0,"tn":0,"imp":12000,"gas":0,"lt":0,"com":1000,"pj":0},{"f":"2025-10-29","m":"FTP3370","cl":"Chevrolet Florida","o":"Florida","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":4886.0,"gas":0,"lt":0,"com":0,"pj":0},{"f":"2025-11-12","m":"FTP3370","cl":"Urufor SA","o":"Urufor","d":"Schandy","me":"Tablas","ch":"Adrian","km":500,"tn":30.88,"imp":32424,"gas":15677,"lt":315.0,"com":3000,"pj":2454},{"f":"2025-11-12","m":"FTP3556","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":1050,"pj":0},{"f":"2025-11-11","m":"FTP3172","cl":"Horizonte","o":"Polo Oeste","d":"Rivera","me":"Autos","ch":"Lucas Matheus","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":0,"pj":0},{"f":"2025-10-31","m":"FTP2560","cl":"Amberplan","o":"UPM","d":"Montevideo","me":"Celulosa","ch":"Gonzalo","km":0,"tn":0,"imp":26840,"gas":16089.0,"lt":320.9,"com":3000,"pj":0},{"f":"2025-11-19","m":"FTP3370","cl":"Horizonte","o":"Rilcomar","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":3,"imp":16470,"gas":0,"lt":0,"com":1350,"pj":0},{"f":"2025-11-20","m":"FTP3556","cl":"Horizonte","o":"Alfredo Ramon","d":"Rivera","me":"Autos","ch":"Gabriel","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":0,"pj":0},{"f":"2025-11-25","m":"FTP2559","cl":"Urufor SA","o":"Urufor","d":"Schandy","me":"Tablas","ch":"Miguel Yunu","km":500,"tn":30.31,"imp":31826.0,"gas":12000,"lt":241.1,"com":2800,"pj":2454},{"f":"2025-12-05","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":0,"tn":31.64,"imp":33222,"gas":15941.0,"lt":320.3,"com":2800,"pj":2454},{"f":"2025-01-03","m":"FTP3556","cl":"Urufor SA","o":"Urufor","d":"Tecomar","me":"Tablas","ch":"Gabriel","km":500,"tn":31.97,"imp":33568.0,"gas":16488.0,"lt":337.2,"com":2800,"pj":2502},{"f":"2026-01-19","m":"FTP3448","cl":"Mauricio Cancela","o":"Arboreal","d":"Carrasco","me":"Tablas","ch":"Adrian","km":0,"tn":0,"imp":50020,"gas":15228.0,"lt":311.4,"com":3000,"pj":2502},{"f":"2026-01-28","m":"FTP3448","cl":"Automotora El Gaucho","o":"Ayax","d":"Rivera","me":"Autos","ch":"Adrian","km":0,"tn":1,"imp":5490,"gas":0,"lt":0,"com":0,"pj":0}];
+let filtered = [...RAW];
+
+function fmt(n) { return n.toLocaleString('es-UY', {maximumFractionDigits:0}); }
+function fmtM(n) { if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(0)+'K'; return n.toFixed(0); }
+
+// Populate filter dropdowns
+function populateFilters() {
+  const mats = [...new Set(RAW.map(d=>d.m))].sort();
+  const chos = [...new Set(RAW.map(d=>d.ch).filter(Boolean))].sort();
+  const clis = [...new Set(RAW.map(d=>d.cl).filter(Boolean))].sort();
+  const mers = [...new Set(RAW.map(d=>d.me).filter(Boolean))].sort();
+  
+  ['f-mat','fv-mat'].forEach(id => { const s=document.getElementById(id); if(s) mats.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; s.appendChild(o); }); });
+  ['f-cho','fv-cho'].forEach(id => { const s=document.getElementById(id); if(s) chos.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; s.appendChild(o); }); });
+  ['f-cli','fv-cli'].forEach(id => { const s=document.getElementById(id); if(s) clis.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; s.appendChild(o); }); });
+  const sv=document.getElementById('fv-mer'); if(sv) mers.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; sv.appendChild(o); });
+}
+
+function applyFilters() {
+  const mat = document.getElementById('f-mat').value;
+  const cho = document.getElementById('f-cho').value;
+  const cli = document.getElementById('f-cli').value;
+  const from = document.getElementById('f-from').value;
+  const to = document.getElementById('f-to').value;
+  
+  filtered = RAW.filter(d => {
+    if(mat && d.m !== mat) return false;
+    if(cho && d.ch !== cho) return false;
+    if(cli && d.cl !== cli) return false;
+    if(from && d.f < from) return false;
+    if(to && d.f > to) return false;
+    return true;
+  });
+  renderDashboard();
+}
+
+function clearFilters() {
+  document.getElementById('f-mat').value='';
+  document.getElementById('f-cho').value='';
+  document.getElementById('f-cli').value='';
+  document.getElementById('f-from').value='';
+  document.getElementById('f-to').value='';
+  filtered = [...RAW];
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const totalInc = filtered.reduce((s,d) => s+d.imp, 0);
+  const totalGas = filtered.reduce((s,d) => s+d.gas, 0);
+  const totalCom = filtered.reduce((s,d) => s+d.com, 0);
+  const totalPj = filtered.reduce((s,d) => s+d.pj, 0);
+  const totalProfit = totalInc - totalGas - totalCom - totalPj;
+  
+  document.getElementById('kpi-income').textContent = '$' + fmtM(totalInc);
+  document.getElementById('kpi-income-sub').textContent = fmt(filtered.length) + ' viajes registrados';
+  document.getElementById('kpi-profit').textContent = '$' + fmtM(totalProfit);
+  document.getElementById('kpi-profit-sub').textContent = 'Margen: ' + (totalInc>0 ? ((totalProfit/totalInc)*100).toFixed(1) : 0) + '%';
+  document.getElementById('kpi-trips').textContent = fmt(filtered.length);
+  document.getElementById('kpi-trips-sub').textContent = fmt(filtered.reduce((s,d)=>s+d.tn,0)) + ' toneladas';
+  document.getElementById('kpi-gas').textContent = '$' + fmtM(totalGas);
+  document.getElementById('kpi-gas-sub').textContent = fmt(filtered.reduce((s,d)=>s+d.lt,0)) + ' litros';
+
+  // Bar chart - by month
+  const monthly = {};
+  filtered.forEach(d => {
+    const ym = d.f.substring(0,7);
+    if(!monthly[ym]) monthly[ym] = {inc:0, exp:0};
+    monthly[ym].inc += d.imp;
+    monthly[ym].exp += d.gas + d.com + d.pj;
+  });
+  const months = Object.keys(monthly).sort().slice(-12);
+  const maxVal = Math.max(...months.map(m => Math.max(monthly[m].inc, monthly[m].exp)), 1);
+  
+  let barHtml = '<div class="bar-chart">';
+  months.forEach(m => {
+    const incH = (monthly[m].inc / maxVal * 180);
+    const expH = (monthly[m].exp / maxVal * 180);
+    const label = m.substring(5);
+    barHtml += '<div class="bar-group">';
+    barHtml += '<div style="display:flex;gap:2px;align-items:end;width:100%;height:190px">';
+    barHtml += `<div class="bar income" style="height:${incH}px;flex:1"><div class="bar-value">${fmtM(monthly[m].inc)}</div></div>`;
+    barHtml += `<div class="bar expense" style="height:${expH}px;flex:1"></div>`;
+    barHtml += '</div>';
+    barHtml += `<div class="bar-label">${label}</div>`;
+    barHtml += '</div>';
+  });
+  barHtml += '</div>';
+  document.getElementById('barChart').innerHTML = barHtml;
+
+  // Donut chart
+  const byMat = {};
+  filtered.forEach(d => { if(!byMat[d.m]) byMat[d.m]=0; byMat[d.m]+=d.imp; });
+  const matEntries = Object.entries(byMat).sort((a,b)=>b[1]-a[1]);
+  const colors = ['#00d4ff','#7c5fff','#00e89d','#ffa502','#ff4757','#ff6b9d','#a29bfe','#fd9644','#45aaf2','#26de81','#fc5c65','#778ca3','#f7b731','#0fb9b1','#eb3b5a','#2d98da'];
+  
+  const canvas = document.getElementById('donutCanvas');
+  const ctx = canvas.getContext('2d');
+  const total = matEntries.reduce((s,e)=>s+e[1],0);
+  let startAngle = -Math.PI/2;
+  ctx.clearRect(0,0,160,160);
+  
+  matEntries.forEach((e,i) => {
+    const slice = (e[1]/total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(80,80,70,startAngle,startAngle+slice);
+    ctx.arc(80,80,45,startAngle+slice,startAngle,true);
+    ctx.closePath();
+    ctx.fillStyle = colors[i%colors.length];
+    ctx.fill();
+    startAngle += slice;
+  });
+  
+  // Center text
+  ctx.fillStyle = '#e8e9f0';
+  ctx.font = 'bold 14px JetBrains Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText(matEntries.length, 80, 76);
+  ctx.fillStyle = '#6a6b80';
+  ctx.font = '10px DM Sans';
+  ctx.fillText('camiones', 80, 92);
+
+  let legendHtml = '';
+  matEntries.slice(0,8).forEach((e,i) => {
+    const pct = ((e[1]/total)*100).toFixed(1);
+    legendHtml += `<div class="legend-item"><div class="legend-dot" style="background:${colors[i%colors.length]}"></div>${e[0]} (${pct}%)</div>`;
+  });
+  document.getElementById('donutLegend').innerHTML = legendHtml;
+
+  // Table
+  const sorted = [...filtered].sort((a,b) => b.f.localeCompare(a.f));
+  let tbHtml = '';
+  sorted.slice(0,100).forEach(d => {
+    const profit = d.imp - d.gas - d.com - d.pj;
+    const profitClass = profit >= 0 ? 'positive' : 'negative';
+    tbHtml += `<tr>
+      <td style="font-family:JetBrains Mono;font-size:11px">${d.f}</td>
+      <td><span class="matricula-badge">${d.m}</span></td>
+      <td>${d.ch}</td>
+      <td>${d.cl}</td>
+      <td>${d.o} → ${d.d}</td>
+      <td>${d.me}</td>
+      <td class="num">${fmt(d.imp)}</td>
+      <td class="num" style="color:var(--red)">${fmt(d.gas)}</td>
+      <td class="num ${profitClass}">${fmt(profit)}</td>
+    </tr>`;
+  });
+  document.getElementById('tableBody').innerHTML = tbHtml;
+  document.getElementById('tableCount').textContent = filtered.length + ' registros';
+}
+
+// Viajes view
+function applyViajesFilter() {
+  const mat=document.getElementById('fv-mat').value;
+  const cho=document.getElementById('fv-cho').value;
+  const cli=document.getElementById('fv-cli').value;
+  const mer=document.getElementById('fv-mer').value;
+  const from=document.getElementById('fv-from').value;
+  const to=document.getElementById('fv-to').value;
+  
+  let f = RAW.map((d,i)=>({...d,_i:i})).filter(d => {
+    if(mat && d.m!==mat) return false;
+    if(cho && d.ch!==cho) return false;
+    if(cli && d.cl!==cli) return false;
+    if(mer && d.me!==mer) return false;
+    if(from && d.f<from) return false;
+    if(to && d.f>to) return false;
+    return true;
+  }).sort((a,b)=>b.f.localeCompare(a.f));
+
+  let html='';
+  f.forEach(d => {
+    const profit = d.imp-d.gas-d.com-d.pj;
+    html += `<tr><td style="font-family:JetBrains Mono;font-size:11px">${d.f}</td><td><span class="matricula-badge">${d.m}</span></td><td>—</td><td>${d.ch}</td><td>${d.cl}</td><td>${d.o}</td><td>${d.d}</td><td>${d.me}</td><td class="num">${fmt(d.km)}</td><td class="num">${d.tn}</td><td class="num">${fmt(d.imp)}</td><td class="num" style="color:var(--red)">${fmt(d.gas)}</td><td class="num">${fmt(d.com)}</td><td class="num">${fmt(d.pj)}</td><td class="num ${profit>=0?'positive':'negative'}">${fmt(profit)}</td><td><div class="row-actions"><button class="row-btn" onclick="openModal(${d._i})" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="row-btn del" onclick="confirmDelete(${d._i})" title="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></td></tr>`;
+  });
+  document.getElementById('viajesBody').innerHTML = html;
+  document.getElementById('viajesCount').textContent = f.length + ' viajes';
+}
+function clearViajesFilter() {
+  ['fv-mat','fv-cho','fv-cli','fv-mer'].forEach(id=>document.getElementById(id).value='');
+  ['fv-from','fv-to'].forEach(id=>document.getElementById(id).value='');
+  applyViajesFilter();
+}
+
+// Camiones view
+function renderCamiones() {
+  const byMat = {};
+  RAW.forEach(d => {
+    if(!byMat[d.m]) byMat[d.m]={trips:0,inc:0,gas:0,com:0,pj:0,lt:0};
+    byMat[d.m].trips++;
+    byMat[d.m].inc+=d.imp;
+    byMat[d.m].gas+=d.gas;
+    byMat[d.m].com+=d.com;
+    byMat[d.m].pj+=d.pj;
+    byMat[d.m].lt+=d.lt;
+  });
+  const entries = Object.entries(byMat).sort((a,b)=>b[1].inc-a[1].inc);
+  
+  // KPI
+  document.getElementById('camionesKPI').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Total Camiones</div><div class="kpi-value blue">${entries.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Más Viajes</div><div class="kpi-value green">${entries[0]?entries[0][0]:'—'}</div><div class="kpi-sub">${entries[0]?entries[0][1].trips:0} viajes</div></div>
+    <div class="kpi-card"><div class="kpi-label">Mayor Ingreso</div><div class="kpi-value orange">${entries[0]?entries[0][0]:'—'}</div><div class="kpi-sub">${entries[0]?'$'+fmtM(entries[0][1].inc):''}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Mayor Consumo</div><div class="kpi-value purple">${entries.sort((a,b)=>b[1].lt-a[1].lt)[0]?entries[0][0]:'—'}</div><div class="kpi-sub">${entries[0]?fmt(entries[0][1].lt)+' lts':''}</div></div>
+  `;
+  entries.sort((a,b)=>b[1].inc-a[1].inc);
+
+  // Bar charts
+  const maxInc = Math.max(...entries.map(e=>e[1].inc),1);
+  const maxGas = Math.max(...entries.map(e=>e[1].lt),1);
+  const colors = ['#00d4ff','#7c5fff','#00e89d','#ffa502','#ff4757','#ff6b9d','#a29bfe','#fd9644','#45aaf2','#26de81','#fc5c65','#778ca3','#f7b731','#0fb9b1','#eb3b5a','#2d98da'];
+  
+  let bHtml = '<div class="bar-chart">';
+  entries.forEach((e,i) => {
+    const h = e[1].inc/maxInc*180;
+    bHtml += `<div class="bar-group"><div class="bar" style="height:${h}px;background:${colors[i%colors.length]};border-radius:4px 4px 0 0"><div class="bar-value">${fmtM(e[1].inc)}</div></div><div class="bar-label">${e[0]}</div></div>`;
+  });
+  bHtml += '</div>';
+  document.getElementById('camionesBarChart').innerHTML = bHtml;
+
+  let gHtml = '<div class="bar-chart">';
+  entries.forEach((e,i) => {
+    const h = e[1].lt/maxGas*180;
+    gHtml += `<div class="bar-group"><div class="bar" style="height:${h}px;background:${colors[i%colors.length]};border-radius:4px 4px 0 0"><div class="bar-value">${fmtM(e[1].lt)}</div></div><div class="bar-label">${e[0]}</div></div>`;
+  });
+  gHtml += '</div>';
+  document.getElementById('camionesGasChart').innerHTML = gHtml;
+
+  // Table
+  let html = '';
+  entries.forEach(e => {
+    const profit = e[1].inc-e[1].gas-e[1].com-e[1].pj;
+    const margin = e[1].inc>0?((profit/e[1].inc)*100).toFixed(1):'0';
+    html += `<tr><td><span class="matricula-badge">${e[0]}</span></td><td class="num">${e[1].trips}</td><td class="num">${fmt(e[1].inc)}</td><td class="num" style="color:var(--red)">${fmt(e[1].gas)}</td><td class="num">${fmt(e[1].com)}</td><td class="num">${fmt(e[1].pj)}</td><td class="num ${profit>=0?'positive':'negative'}">${fmt(profit)}</td><td class="num">${margin}%</td></tr>`;
+  });
+  document.getElementById('camionesBody').innerHTML = html;
+}
+
+// Choferes view
+function renderChoferes() {
+  const byCho = {};
+  RAW.forEach(d => {
+    if(!d.ch) return;
+    if(!byCho[d.ch]) byCho[d.ch]={trips:0,inc:0,gas:0,lt:0,com:0};
+    byCho[d.ch].trips++;
+    byCho[d.ch].inc+=d.imp;
+    byCho[d.ch].gas+=d.gas;
+    byCho[d.ch].lt+=d.lt;
+    byCho[d.ch].com+=d.com;
+  });
+  const entries = Object.entries(byCho).sort((a,b)=>b[1].inc-a[1].inc);
+  let html='';
+  entries.forEach(e => {
+    const avg = e[1].trips>0?(e[1].inc/e[1].trips):0;
+    html += `<tr><td style="font-weight:600">${e[0]}</td><td class="num">${e[1].trips}</td><td class="num">${fmt(e[1].inc)}</td><td class="num" style="color:var(--red)">${fmt(e[1].gas)}</td><td class="num">${fmt(e[1].lt)}</td><td class="num">${fmt(e[1].com)}</td><td class="num">${fmt(avg)}</td></tr>`;
+  });
+  document.getElementById('choferesBody').innerHTML = html;
+}
+
+// Reportes view
+function renderReportes() {
+  // Top clients
+  const byCli = {};
+  RAW.forEach(d => { if(!byCli[d.cl]) byCli[d.cl]=0; byCli[d.cl]+=d.imp; });
+  const topCli = Object.entries(byCli).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxCli = topCli[0]?topCli[0][1]:1;
+  let cHtml = '';
+  topCli.forEach((e,i) => {
+    const w = (e[1]/maxCli*100);
+    cHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:120px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e[0]}">${e[0]}</div><div style="flex:1;height:16px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="width:${w}%;height:100%;background:linear-gradient(90deg,#00d4ff,#7c5fff);border-radius:4px"></div></div><div style="font-size:10px;font-family:JetBrains Mono;color:var(--text3);width:50px;text-align:right">${fmtM(e[1])}</div></div>`;
+  });
+  document.getElementById('topClients').innerHTML = cHtml;
+
+  // Top routes
+  const byRoute = {};
+  RAW.forEach(d => { const r=d.o+'→'+d.d; if(!byRoute[r]) byRoute[r]=0; byRoute[r]++; });
+  const topRt = Object.entries(byRoute).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxRt = topRt[0]?topRt[0][1]:1;
+  let rHtml = '';
+  topRt.forEach(e => {
+    const w = (e[1]/maxRt*100);
+    rHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:120px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e[0]}">${e[0]}</div><div style="flex:1;height:16px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="width:${w}%;height:100%;background:linear-gradient(90deg,#00e89d,#00d4ff);border-radius:4px"></div></div><div style="font-size:10px;font-family:JetBrains Mono;color:var(--text3);width:40px;text-align:right">${e[1]}</div></div>`;
+  });
+  document.getElementById('topRoutes').innerHTML = rHtml;
+
+  // Top mercaderias
+  const byMerc = {};
+  RAW.forEach(d => { if(!d.me) return; if(!byMerc[d.me]) byMerc[d.me]=0; byMerc[d.me]++; });
+  const topMerc = Object.entries(byMerc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxMerc = topMerc[0]?topMerc[0][1]:1;
+  let mHtml = '';
+  topMerc.forEach(e => {
+    const w = (e[1]/maxMerc*100);
+    mHtml += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:120px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e[0]}">${e[0]}</div><div style="flex:1;height:16px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="width:${w}%;height:100%;background:linear-gradient(90deg,#ffa502,#ff4757);border-radius:4px"></div></div><div style="font-size:10px;font-family:JetBrains Mono;color:var(--text3);width:40px;text-align:right">${e[1]}</div></div>`;
+  });
+  document.getElementById('topMerc').innerHTML = mHtml;
+}
+
+// Gasoil view
+function renderGasoil() {
+  const withGas = RAW.filter(d=>d.gas>0);
+  const totalLts = withGas.reduce((s,d)=>s+d.lt,0);
+  const totalGas = withGas.reduce((s,d)=>s+d.gas,0);
+  const avgPrice = totalLts>0?(totalGas/totalLts):0;
+  
+  document.getElementById('gasoilKPI').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Gasto Total Gasoil</div><div class="kpi-value blue">$${fmtM(totalGas)}</div><div class="kpi-sub">${withGas.length} cargas registradas</div></div>
+    <div class="kpi-card"><div class="kpi-label">Litros Totales</div><div class="kpi-value green">${fmt(totalLts)}</div><div class="kpi-sub">lts consumidos</div></div>
+    <div class="kpi-card"><div class="kpi-label">Precio Promedio/Lt</div><div class="kpi-value orange">$${avgPrice.toFixed(1)}</div></div>
+  `;
+
+  // Monthly gasoil chart
+  const monthly = {};
+  withGas.forEach(d => {
+    const ym = d.f.substring(0,7);
+    if(!monthly[ym]) monthly[ym]={gas:0,lt:0};
+    monthly[ym].gas+=d.gas;
+    monthly[ym].lt+=d.lt;
+  });
+  const months = Object.keys(monthly).sort().slice(-18);
+  const maxG = Math.max(...months.map(m=>monthly[m].gas),1);
+  
+  let html = '<div class="bar-chart">';
+  months.forEach(m => {
+    const h = monthly[m].gas/maxG*200;
+    html += `<div class="bar-group"><div class="bar" style="height:${h}px;background:linear-gradient(180deg,#ff4757,#cc3344);border-radius:4px 4px 0 0"><div class="bar-value">${fmtM(monthly[m].gas)}</div></div><div class="bar-label">${m.substring(5)}</div></div>`;
+  });
+  html += '</div>';
+  document.getElementById('gasoilChart').innerHTML = html;
+}
+
+// Navigation
+function showView(view) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  event.currentTarget.classList.add('active');
+  
+  const titles = {dashboard:'Dashboard General',viajes:'Explorador de Viajes',camiones:'Flota de Camiones',choferes:'Rendimiento de Choferes',reportes:'Reportes y Análisis',gasoil:'Control de Gasoil'};
+  document.getElementById('pageTitle').textContent = titles[view]||'Dashboard';
+  
+  if(view==='viajes') applyViajesFilter();
+  if(view==='camiones') renderCamiones();
+  if(view==='choferes') renderChoferes();
+  if(view==='reportes') renderReportes();
+  if(view==='gasoil') renderGasoil();
+}
+
+// Init
+populateFilters();
+renderDashboard();
+
+// ===== CRUD FUNCTIONALITY =====
+let editingIndex = null;
+
+function openModal(idx) {
+  editingIndex = (idx !== undefined) ? idx : null;
+  const m = document.getElementById('modalOverlay');
+  document.getElementById('modalTitle').textContent = editingIndex !== null ? 'Editar Viaje' : 'Nuevo Viaje';
+  const fields = ['mf','mMat','mCho','mCli','mOri','mDest','mMerc','mKm','mTn','mImp','mGas','mLt','mCom','mPj'];
+  if (editingIndex !== null) {
+    const d = RAW[editingIndex];
+    document.getElementById('mf').value = d.f;
+    document.getElementById('mMat').value = d.m;
+    document.getElementById('mCho').value = d.ch;
+    document.getElementById('mCli').value = d.cl;
+    document.getElementById('mOri').value = d.o;
+    document.getElementById('mDest').value = d.d;
+    document.getElementById('mMerc').value = d.me;
+    document.getElementById('mKm').value = d.km;
+    document.getElementById('mTn').value = d.tn;
+    document.getElementById('mImp').value = d.imp;
+    document.getElementById('mGas').value = d.gas;
+    document.getElementById('mLt').value = d.lt;
+    document.getElementById('mCom').value = d.com;
+    document.getElementById('mPj').value = d.pj;
+  } else {
+    fields.forEach(id => document.getElementById(id).value = '');
+    document.getElementById('mf').value = new Date().toISOString().split('T')[0];
+    ['mKm','mTn','mImp','mGas','mLt','mCom','mPj'].forEach(id => document.getElementById(id).value = 0);
+  }
+  m.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  editingIndex = null;
+}
+
+function saveViaje() {
+  const obj = {
+    f: document.getElementById('mf').value,
+    m: document.getElementById('mMat').value.trim(),
+    ch: document.getElementById('mCho').value.trim(),
+    cl: document.getElementById('mCli').value.trim(),
+    o: document.getElementById('mOri').value.trim(),
+    d: document.getElementById('mDest').value.trim(),
+    me: document.getElementById('mMerc').value.trim(),
+    km: parseFloat(document.getElementById('mKm').value)||0,
+    tn: parseFloat(document.getElementById('mTn').value)||0,
+    imp: parseFloat(document.getElementById('mImp').value)||0,
+    gas: parseFloat(document.getElementById('mGas').value)||0,
+    lt: parseFloat(document.getElementById('mLt').value)||0,
+    com: parseFloat(document.getElementById('mCom').value)||0,
+    pj: parseFloat(document.getElementById('mPj').value)||0
+  };
+  if (!obj.f || !obj.m) { alert('Fecha y Matrícula son obligatorios'); return; }
+  if (editingIndex !== null) {
+    RAW[editingIndex] = obj;
+    showToast('Viaje actualizado correctamente');
+  } else {
+    RAW.push(obj);
+    showToast('Viaje agregado correctamente');
+  }
+  closeModal();
+  filtered = [...RAW];
+  populateFilters();
+  applyViajesFilter();
+  renderDashboard();
+}
+
+let deleteIdx = null;
+function confirmDelete(idx) {
+  deleteIdx = idx;
+  const d = RAW[idx];
+  document.getElementById('confirmText').textContent = 'Viaje del ' + d.f + ' — ' + d.m + ' — ' + d.cl;
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.remove('open');
+  deleteIdx = null;
+}
+function doDelete() {
+  if (deleteIdx !== null) {
+    RAW.splice(deleteIdx, 1);
+    filtered = [...RAW];
+    populateFilters();
+    applyViajesFilter();
+    renderDashboard();
+    showToast('Viaje eliminado');
+  }
+  closeConfirm();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Nuevo Viaje</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="form-group"><label>Fecha *</label><input type="date" id="mf"></div>
+        <div class="form-group"><label>Matrícula *</label><input type="text" id="mMat" placeholder="FTP2558"></div>
+        <div class="form-group"><label>Chofer</label><input type="text" id="mCho" placeholder="Nombre del chofer"></div>
+        <div class="form-group"><label>Cliente</label><input type="text" id="mCli" placeholder="Nombre del cliente"></div>
+        <div class="form-group"><label>Origen</label><input type="text" id="mOri" placeholder="Ciudad origen"></div>
+        <div class="form-group"><label>Destino</label><input type="text" id="mDest" placeholder="Ciudad destino"></div>
+        <div class="form-group"><label>Mercadería</label><input type="text" id="mMerc" placeholder="Tipo de carga"></div>
+        <div class="form-group"><label>Km</label><input type="number" id="mKm" step="any"></div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="modal-grid three">
+          <div class="form-group"><label>Toneladas</label><input type="number" id="mTn" step="any"></div>
+          <div class="form-group"><label>Importe ($)</label><input type="number" id="mImp" step="any"></div>
+          <div class="form-group"><label>Gasoil ($)</label><input type="number" id="mGas" step="any"></div>
+          <div class="form-group"><label>Litros</label><input type="number" id="mLt" step="any"></div>
+          <div class="form-group"><label>Comisión ($)</label><input type="number" id="mCom" step="any"></div>
+          <div class="form-group"><label>Peajes ($)</label><input type="number" id="mPj" step="any"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveViaje()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="confirm-overlay" id="confirmOverlay" onclick="if(event.target===this)closeConfirm()">
+  <div class="confirm-box">
+    <h3>Eliminar Viaje</h3>
+    <p id="confirmText"></p>
+    <div class="btns">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn btn-danger" onclick="doDelete()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+</body>
+</html>

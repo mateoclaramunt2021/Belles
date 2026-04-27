@@ -8,8 +8,6 @@ import {
   LayoutDashboard,
   Truck,
   Users,
-  DollarSign,
-  FileText,
   BarChart2,
   Fuel,
   Plus,
@@ -17,7 +15,6 @@ import {
   X,
   Menu,
   LogOut,
-  ChevronRight,
 } from 'lucide-react'
 
 interface NavItem {
@@ -35,24 +32,17 @@ const adminNav: NavSection[] = [
   {
     section: 'Principal',
     items: [
-      { href: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
-      { href: '/viajes',         icon: List,            label: 'Viajes' },
-      { href: '/camiones',       icon: Truck,           label: 'Camiones' },
-      { href: '/choferes',       icon: Users,           label: 'Choferes' },
-    ],
-  },
-  {
-    section: 'Gestión',
-    items: [
-      { href: '/tarifas',        icon: DollarSign,      label: 'Tarifas' },
-      { href: '/liquidaciones',  icon: FileText,        label: 'Liquidaciones' },
+      { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { href: '/viajes',    icon: List,            label: 'Viajes' },
+      { href: '/camiones',  icon: Truck,           label: 'Camiones' },
+      { href: '/choferes',  icon: Users,           label: 'Choferes' },
     ],
   },
   {
     section: 'Análisis',
     items: [
-      { href: '/reportes',       icon: BarChart2,       label: 'Reportes' },
-      { href: '/gasoil',         icon: Fuel,            label: 'Gasoil' },
+      { href: '/reportes', icon: BarChart2, label: 'Reportes' },
+      { href: '/gasoil',   icon: Fuel,     label: 'Gasoil' },
     ],
   },
 ]
@@ -61,9 +51,9 @@ const choferNav: NavSection[] = [
   {
     section: 'Mi trabajo',
     items: [
-      { href: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
-      { href: '/viajes',         icon: List,            label: 'Mis Viajes' },
-      { href: '/viajes/nuevo',   icon: Plus,            label: 'Nuevo Viaje' },
+      { href: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+      { href: '/viajes',       icon: List,            label: 'Mis Viajes' },
+      { href: '/viajes/nuevo', icon: Plus,            label: 'Nuevo Viaje' },
     ],
   },
 ]
@@ -74,19 +64,26 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
     <Link
       href={item.href}
       onClick={onClick}
+      style={active ? { borderLeft: '3px solid #00d4ff', background: 'rgba(0,212,255,0.06)' } : { borderLeft: '3px solid transparent' }}
       className={`
-        flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-        transition-all duration-150 group
-        ${active
-          ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
-          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-        }
+        flex items-center gap-3 px-4 py-2.5 text-sm font-medium
+        transition-all duration-150
+        ${active ? 'text-accent-cyan' : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'}
       `}
     >
-      <Icon size={18} className={active ? 'text-accent-cyan' : 'text-text-secondary group-hover:text-text-primary'} />
-      <span className="flex-1">{item.label}</span>
-      {active && <ChevronRight size={14} className="text-accent-cyan/60" />}
+      <Icon size={17} className={active ? 'text-accent-cyan' : 'text-text-secondary'} style={{ opacity: active ? 1 : 0.7 }} />
+      <span>{item.label}</span>
     </Link>
+  )
+}
+
+// Pulse dot component
+function PulseDot() {
+  return (
+    <span className="relative flex h-2 w-2">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+      <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+    </span>
   )
 }
 
@@ -101,24 +98,21 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 h-screen bg-bg-secondary border-r border-border-color fixed left-0 top-0 z-30">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-border-color">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg gradient-cyan flex items-center justify-center flex-shrink-0">
-            <Truck size={20} className="text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-text-primary leading-tight">TransControl</p>
-            <p className="text-xs text-text-secondary leading-tight">Belles Uruguay</p>
-          </div>
+      <div className="px-5 py-5 border-b border-border-color flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg gradient-cyan flex items-center justify-center flex-shrink-0">
+          <Truck size={18} className="text-white" />
         </div>
+        <span className="text-xs font-semibold tracking-widest uppercase text-accent-cyan">Belles</span>
       </div>
 
       {/* Navegación */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
+      <nav className="flex-1 py-3 overflow-y-auto">
         {nav.map((section) => (
-          <div key={section.section}>
-            <p className="section-title px-3 mb-2">{section.section}</p>
-            <div className="space-y-0.5">
+          <div key={section.section} className="mb-1">
+            <p className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-text-secondary/50">
+              {section.section}
+            </p>
+            <div>
               {section.items.map((item) => (
                 <NavLink
                   key={item.href}
@@ -132,31 +126,28 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-4 border-t border-border-color pt-3">
-        {/* Usuario actual */}
-        <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
-          <div className="w-8 h-8 rounded-full bg-accent-purple/20 border border-accent-purple/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-bold text-accent-purple uppercase">
-              {profile?.nombre?.charAt(0) ?? '?'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-text-primary truncate">{profile?.nombre ?? 'Usuario'}</p>
-            <p className="text-xs text-text-secondary capitalize">{profile?.rol ?? ''}</p>
-          </div>
+      <div className="px-5 py-4 border-t border-border-color">
+        <div className="flex items-center gap-2 mb-1">
+          <PulseDot />
+          <span className="text-xs text-success font-medium">Sistema activo</span>
         </div>
-        <button
-          onClick={signOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
-                     text-text-secondary hover:text-danger hover:bg-danger/10
-                     transition-all duration-150"
-        >
-          <LogOut size={16} />
-          <span>Cerrar sesión</span>
-        </button>
-        <p className="text-center text-xs text-text-secondary/40 mt-3">
-          Powered by Neuriax
-        </p>
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-accent-purple/20 border border-accent-purple/30 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-bold text-accent-purple uppercase">
+                {profile?.nombre?.charAt(0) ?? '?'}
+              </span>
+            </div>
+            <span className="text-xs text-text-secondary truncate max-w-[100px]">{profile?.nombre ?? 'Usuario'}</span>
+          </div>
+          <button
+            onClick={signOut}
+            title="Cerrar sesión"
+            className="text-text-secondary hover:text-danger transition-colors p-1"
+          >
+            <LogOut size={14} />
+          </button>
+        </div>
       </div>
     </aside>
   )
@@ -187,7 +178,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             <div className="w-8 h-8 rounded-lg gradient-cyan flex items-center justify-center">
               <Truck size={18} className="text-white" />
             </div>
-            <span className="text-sm font-bold text-text-primary">TransControl Belles</span>
+            <span className="text-xs font-semibold tracking-widest uppercase text-accent-cyan">Belles</span>
           </div>
           <button onClick={onClose} className="btn-ghost p-2 rounded-lg">
             <X size={18} />
@@ -195,11 +186,13 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
+        <nav className="flex-1 py-3 overflow-y-auto">
           {nav.map((section) => (
-            <div key={section.section}>
-              <p className="section-title px-3 mb-2">{section.section}</p>
-              <div className="space-y-0.5">
+            <div key={section.section} className="mb-1">
+              <p className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-text-secondary/50">
+                {section.section}
+              </p>
+              <div>
                 {section.items.map((item) => (
                   <NavLink
                     key={item.href}
@@ -214,27 +207,28 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
         </nav>
 
         {/* Footer */}
-        <div className="px-3 pb-5 border-t border-border-color pt-3">
-          <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
-            <div className="w-9 h-9 rounded-full bg-accent-purple/20 border border-accent-purple/30 flex items-center justify-center flex-shrink-0">
-              <span className="text-sm font-bold text-accent-purple uppercase">
-                {profile?.nombre?.charAt(0) ?? '?'}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-text-primary truncate">{profile?.nombre ?? 'Usuario'}</p>
-              <p className="text-xs text-text-secondary capitalize">{profile?.rol ?? ''}</p>
-            </div>
+        <div className="px-5 py-4 border-t border-border-color">
+          <div className="flex items-center gap-2 mb-3">
+            <PulseDot />
+            <span className="text-xs text-success font-medium">Sistema activo</span>
           </div>
-          <button
-            onClick={() => { signOut(); onClose() }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
-                       text-text-secondary hover:text-danger hover:bg-danger/10
-                       transition-all duration-150"
-          >
-            <LogOut size={16} />
-            <span>Cerrar sesión</span>
-          </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-accent-purple/20 border border-accent-purple/30 flex items-center justify-center">
+                <span className="text-xs font-bold text-accent-purple uppercase">
+                  {profile?.nombre?.charAt(0) ?? '?'}
+                </span>
+              </div>
+              <span className="text-xs text-text-secondary">{profile?.nombre ?? 'Usuario'}</span>
+            </div>
+            <button
+              onClick={() => { signOut(); onClose() }}
+              title="Cerrar sesión"
+              className="text-text-secondary hover:text-danger transition-colors p-1"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </aside>
     </>

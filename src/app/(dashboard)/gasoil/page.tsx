@@ -1,316 +1,107 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { KPICard } from '@/components/ui/KPICard'
-import { DataTable, type Column } from '@/components/ui/DataTable'
-import { GasoilChart } from '@/components/ui/Chart'
-import toast from 'react-hot-toast'
-import { Plus, Pencil, Trash2, Fuel, TrendingDown, Gauge } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
-interface GasoilRegistro {
-  id:         string
-  fecha:      string
-  matricula:  string
-  litros:     number
-  precio_litro: number
-  total:      number
-  kilometros?: number
-  created_at: string
+interface ViajeGas { fecha: string; gasto_gasoil: number; litros_gasoil: number }
+
+function fmt(n) { return (n ?? 0).toLocaleString('es-UY', { maximumFractionDigits: 0 }) }
+function fmtM(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K'
+  return n.toFixed(0)
 }
+const tooltipStyle = { contentStyle: { background: '#22232f', border: '1px solid #2a2b3a', borderRadius: 8, fontSize: 11 }, labelStyle: { color: '#9a9bb0' }, itemStyle: { color: '#e8e9f0' } }
 
-interface GasoilForm {
-  fecha:        string
-  matricula:    string
-  litros:       number
-  precio_litro: number
-  kilometros:   number
-}
-
-const defaultForm: GasoilForm = {
-  fecha:        new Date().toISOString().split('T')[0],
-  matricula:    '',
-  litros:       0,
-  precio_litro: 0,
-  kilometros:   0,
-}
-
-interface GasoilMensual {
-  mes:    string
-  litros: number
-  gasto:  number
+function KPI({ label, value, sub, color }) {
+  return (
+    <div className="relative bg-bg-secondary border border-border-color rounded-xl p-5 overflow-hidden">
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
+      <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary mb-2">{label}</p>
+      <p className="font-mono text-2xl font-bold text-text-primary">{value}</p>
+      {sub && <p className="font-mono text-xs text-text-secondary mt-1">{sub}</p>}
+    </div>
+  )
 }
 
 export default function GasoilPage() {
   const supabase = createClient()
-  const [registros, setRegistros] = useState<GasoilRegistro[]>([])
-  const [mensual, setMensual]     = useState<GasoilMensual[]>([])
-  const [camiones, setCamiones]   = useState<string[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editId, setEditId]       = useState<string | null>(null)
-  const [deleteId, setDeleteId]   = useState<string | null>(null)
-  const [form, setForm]           = useState<GasoilForm>(defaultForm)
-  const [saving, setSaving]       = useState(false)
-  const [filtroMat, setFiltroMat] = useState('')
+  const [viajes, setViajes] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-
-    // Gasoil viene de viajes.gasto_gasoil en la tabla viajes
-    // Para un registro independiente necesitaríamos tabla gasoil_registros
-    // Acá vamos a usar los datos de viajes que tienen gasto_gasoil > 0
-    const { data: viajesData } = await supabase
-      .from('viajes')
-      .select('id, fecha, matricula, gasto_gasoil, kilometros')
-      .gt('gasto_gasoil', 0)
-      .order('fecha', { ascending: false })
-
-    const viajes = viajesData ?? []
-
-    // Transformar viajes con gasoil en "registros" para visualizar
-    // También intentamos cargar tabla gasoil_registros si existe
-    const { data: gasData } = await supabase
-      .from('gasoil_registros' as any)
-      .select('*')
-      .order('fecha', { ascending: false })
-
-    let regs: GasoilRegistro[] = []
-    if (gasData && Array.isArray(gasData) && gasData.length > 0) {
-      regs = gasData as GasoilRegistro[]
-    } else {
-      // Fallback: construir desde viajes
-      regs = viajes.map((v: any) => ({
-        id:           v.id,
-        fecha:        v.fecha,
-        matricula:    v.matricula,
-        litros:       0, // no tenemos litros granulares en viajes
-        precio_litro: 0,
-        total:        v.gasto_gasoil ?? 0,
-        kilometros:   v.kilometros,
-        created_at:   v.fecha,
-      }))
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('viajes').select('fecha,gasto_gasoil,litros_gasoil').gt('gasto_gasoil', 0)
+      setViajes(data ?? [])
+      setLoading(false)
     }
-
-    // KPIs mensuales agrupados
-    const mapa: Record<string, { litros: number; gasto: number }> = {}
-    regs.forEach((r) => {
-      const mes = r.fecha.substring(0, 7)
-      if (!mapa[mes]) mapa[mes] = { litros: 0, gasto: 0 }
-      mapa[mes].litros += r.litros
-      mapa[mes].gasto  += r.total
-    })
-
-    const mensualArr: GasoilMensual[] = Object.entries(mapa)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6)
-      .map(([mes, v]) => ({ mes, ...v }))
-
-    const matriculas = [...new Set(regs.map((r) => r.matricula).filter(Boolean))]
-
-    setRegistros(regs)
-    setMensual(mensualArr)
-    setCamiones(matriculas)
-    setLoading(false)
+    load()
   }, [supabase])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const totalGasto  = useMemo(() => viajes.reduce((s, v) => s + (v.gasto_gasoil ?? 0), 0), [viajes])
+  const totalLitros = useMemo(() => viajes.reduce((s, v) => s + (v.litros_gasoil ?? 0), 0), [viajes])
+  const precioAvg   = totalLitros > 0 ? totalGasto / totalLitros : 0
 
-  const totalGasto  = registros.reduce((s, r) => s + (r.total ?? 0), 0)
-  const totalLitros = registros.reduce((s, r) => s + (r.litros ?? 0), 0)
-  const precioPromedio = totalLitros > 0 ? totalGasto / totalLitros : 0
+  const barData = useMemo(() => {
+    const m = {}
+    viajes.forEach(v => {
+      const ym = v.fecha.substring(0, 7)
+      if (!m[ym]) m[ym] = { gasto: 0, litros: 0 }
+      m[ym].gasto  += v.gasto_gasoil ?? 0
+      m[ym].litros += v.litros_gasoil ?? 0
+    })
+    return Object.keys(m).sort().slice(-18).map(k => ({ mes: k.substring(5), gasto: m[k].gasto, litros: m[k].litros }))
+  }, [viajes])
 
-  const openCreate = () => { setForm(defaultForm); setEditId(null); setModalOpen(true) }
-  const openEdit   = (r: GasoilRegistro) => {
-    setForm({ fecha: r.fecha, matricula: r.matricula, litros: r.litros, precio_litro: r.precio_litro, kilometros: r.kilometros ?? 0 })
-    setEditId(r.id)
-    setModalOpen(true)
-  }
-
-  const handleSave = async () => {
-    if (!form.matricula) { toast.error('Ingresá la matrícula'); return }
-    if (form.litros <= 0) { toast.error('Los litros deben ser mayores a 0'); return }
-    setSaving(true)
-
-    const payload = {
-      fecha:        form.fecha,
-      matricula:    form.matricula,
-      litros:       form.litros,
-      precio_litro: form.precio_litro,
-      total:        form.litros * form.precio_litro,
-      kilometros:   form.kilometros || null,
-    }
-
-    const { error } = editId
-      ? await supabase.from('gasoil_registros' as any).update(payload).eq('id', editId)
-      : await supabase.from('gasoil_registros' as any).insert(payload)
-
-    setSaving(false)
-    if (error) {
-      toast.error('Para registrar gasoil individualmente, ejecutá el schema SQL de gasoil_registros primero.')
-    } else {
-      toast.success(editId ? 'Registro actualizado' : 'Registro creado')
-      setModalOpen(false)
-      fetchData()
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteId) return
-    await supabase.from('gasoil_registros' as any).delete().eq('id', deleteId)
-    toast.success('Registro eliminado')
-    setDeleteId(null)
-    fetchData()
-  }
-
-  const filtrados = filtroMat ? registros.filter((r) => r.matricula === filtroMat) : registros
-
-  const columns: Column<GasoilRegistro>[] = [
-    { key: 'fecha', header: 'Fecha', render: (v) => <span className="font-data text-xs">{String(v)}</span> },
-    { key: 'matricula', header: 'Matrícula', render: (v) => <span className="font-data text-sm text-accent-cyan font-medium">{String(v)}</span> },
-    { key: 'litros', header: 'Litros', render: (v) => <span className="font-data text-sm">{Number(v).toLocaleString('es-UY', { maximumFractionDigits: 1 })} L</span> },
-    { key: 'precio_litro', header: '$/L', className: 'hidden md:table-cell', render: (v) => <span className="font-data text-xs text-text-secondary">${Number(v).toLocaleString('es-UY')}</span> },
-    { key: 'total', header: 'Total', render: (v) => <span className="font-data text-sm font-bold text-warning">${Number(v).toLocaleString('es-UY')}</span> },
-    { key: 'kilometros', header: 'KM', className: 'hidden lg:table-cell', render: (v) => v ? <span className="font-data text-xs text-text-secondary">{Number(v).toLocaleString('es-UY')}</span> : <span className="text-text-secondary/40">—</span> },
-  ]
-
-  // Chart data format: { name, litros, gasto }
-  const chartData = mensual.map((m) => ({ mes: m.mes.substring(5), litros: m.litros, gasto: m.gasto }))
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Gasoil</h1>
-          <p className="text-text-secondary text-sm mt-0.5">Control de consumo y gastos de combustible</p>
-        </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={15} /> Registrar carga
-        </button>
+    <div className="space-y-5 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KPI label="Gasto Total Gasoil" value={'$' + fmtM(totalGasto)} sub={viajes.length + ' registros'} color="linear-gradient(135deg,#00d4ff,#7c5fff)" />
+        <KPI label="Litros Totales" value={fmt(Math.round(totalLitros)) + ' lt'} color="linear-gradient(135deg,#00e89d,#00d4ff)" />
+        <KPI label="Precio Prom./Lt" value={'$' + precioAvg.toFixed(2)} color="linear-gradient(135deg,#ffa502,#ff4757)" />
       </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KPICard title="Gasto total" value={totalGasto} icon={Fuel} color="orange" isMoney />
-        <KPICard title="Litros totales" value={totalLitros} icon={TrendingDown} color="cyan" subtitle="litros cargados" />
-        <KPICard title="Precio promedio" value={precioPromedio} icon={Gauge} color="purple" isMoney subtitle="por litro" />
-      </div>
-
-      {/* Gráfico mensual */}
       <div className="card">
-        <h2 className="text-sm font-semibold text-text-primary mb-4">Consumo mensual</h2>
-        <GasoilChart data={chartData} />
+        <h3 className="text-sm font-semibold mb-4 text-text-primary">Consumo de Gasoil por Mes</h3>
+        {barData.length === 0 ? (
+          <div className="h-52 flex items-center justify-center text-text-secondary text-xs">Sin datos</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={barData} barGap={3} barCategoryGap="30%">
+              <defs>
+                <linearGradient id="gasGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#ff4757" />
+                  <stop offset="100%" stopColor="#7c5fff" />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="mes" tick={{ fill: '#6a6b80', fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip
+                formatter={(value, name) => [name === 'gasto' ? '$' + fmtM(value) : fmt(value) + ' lt', name === 'gasto' ? 'Gasto' : 'Litros']}
+                contentStyle={tooltipStyle.contentStyle}
+                labelStyle={tooltipStyle.labelStyle}
+                itemStyle={tooltipStyle.itemStyle}
+              />
+              <Bar dataKey="gasto"  fill="url(#gasGrad)" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="litros" fill="#00e89d"        radius={[3, 3, 0, 0]} opacity={0.7} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+        <div className="flex gap-4 mt-2">
+          <span className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <span className="w-3 h-2 rounded-sm inline-block" style={{ background: 'linear-gradient(135deg,#ff4757,#7c5fff)' }} />Gasto ($)
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <span className="w-3 h-2 rounded-sm bg-success inline-block" />Litros
+          </span>
+        </div>
       </div>
-
-      {/* Por camión */}
-      {camiones.length > 0 && (
-        <div className="card">
-          <h2 className="text-sm font-semibold text-text-primary mb-4">Gasto por camión</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {camiones.map((mat) => {
-              const regsC   = registros.filter((r) => r.matricula === mat)
-              const gastoC  = regsC.reduce((s, r) => s + (r.total ?? 0), 0)
-              const litrosC = regsC.reduce((s, r) => s + (r.litros ?? 0), 0)
-              return (
-                <div key={mat} className="bg-bg-primary rounded-xl p-3 border border-border-color text-center">
-                  <p className="font-data font-bold text-accent-cyan text-sm">{mat}</p>
-                  <p className="font-bold text-warning font-data mt-1">${gastoC.toLocaleString('es-UY')}</p>
-                  {litrosC > 0 && <p className="text-xs text-text-secondary">{litrosC.toFixed(0)} L</p>}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Filtro + Tabla */}
-      <div className="card p-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-border-color flex items-center justify-between gap-4">
-          <h2 className="text-base font-semibold text-text-primary">Registros</h2>
-          {camiones.length > 0 && (
-            <select className="input w-auto text-sm" value={filtroMat} onChange={(e) => setFiltroMat(e.target.value)}>
-              <option value="">Todos los camiones</option>
-              {camiones.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          )}
-        </div>
-        <DataTable
-          columns={columns}
-          data={filtrados}
-          keyField="id"
-          loading={loading}
-          emptyMessage="No hay registros de gasoil"
-          actions={(row) => (
-            <div className="flex items-center justify-end gap-1">
-              <button onClick={() => openEdit(row)} className="p-1.5 rounded-lg text-text-secondary hover:text-accent-cyan hover:bg-accent-cyan/10 transition-all">
-                <Pencil size={14} />
-              </button>
-              <button onClick={() => setDeleteId(row.id)} className="p-1.5 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-all">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          )}
-        />
-      </div>
-
-      {/* Modal crear/editar */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'Editar carga de gasoil' : 'Registrar carga de gasoil'}
-        footer={
-          <>
-            <button onClick={() => setModalOpen(false)} className="btn-secondary text-sm">Cancelar</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm">
-              {saving ? 'Guardando...' : 'Guardar'}
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="form-group">
-            <label className="label">Fecha</label>
-            <input type="date" className="input" value={form.fecha} onChange={(e) => setForm((p) => ({ ...p, fecha: e.target.value }))} />
-          </div>
-          <div className="form-group">
-            <label className="label">Matrícula *</label>
-            <select className="input" value={form.matricula} onChange={(e) => setForm((p) => ({ ...p, matricula: e.target.value }))}>
-              <option value="">Seleccionar camión</option>
-              {camiones.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="form-group">
-              <label className="label">Litros *</label>
-              <input type="number" step="0.1" min="0" className="input font-mono" placeholder="0" value={form.litros || ''} onChange={(e) => setForm((p) => ({ ...p, litros: parseFloat(e.target.value) || 0 }))} />
-            </div>
-            <div className="form-group">
-              <label className="label">Precio por litro</label>
-              <input type="number" step="0.01" min="0" className="input font-mono" placeholder="0" value={form.precio_litro || ''} onChange={(e) => setForm((p) => ({ ...p, precio_litro: parseFloat(e.target.value) || 0 }))} />
-            </div>
-          </div>
-          {form.litros > 0 && form.precio_litro > 0 && (
-            <div className="bg-bg-primary rounded-xl p-3 text-center border border-border-color">
-              <p className="text-xs text-text-secondary">Total</p>
-              <p className="font-data font-bold text-warning text-lg">${(form.litros * form.precio_litro).toLocaleString('es-UY')}</p>
-            </div>
-          )}
-          <div className="form-group">
-            <label className="label">Kilometraje (opcional)</label>
-            <input type="number" className="input font-mono" placeholder="KM actuales" value={form.kilometros || ''} onChange={(e) => setForm((p) => ({ ...p, kilometros: parseInt(e.target.value) || 0 }))} />
-          </div>
-        </div>
-      </Modal>
-
-      {/* Confirm delete */}
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar registro" size="sm"
-        footer={
-          <>
-            <button onClick={() => setDeleteId(null)} className="btn-secondary text-sm">Cancelar</button>
-            <button onClick={handleDelete} className="btn-danger text-sm">Eliminar</button>
-          </>
-        }
-      >
-        <p className="text-text-secondary text-sm">¿Eliminar este registro de gasoil?</p>
-      </Modal>
     </div>
   )
 }
