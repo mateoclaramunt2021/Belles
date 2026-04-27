@@ -6,15 +6,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 
 interface ViajeGas { fecha: string; gasto_gasoil: number; litros_gasoil: number }
 
-function fmt(n) { return (n ?? 0).toLocaleString('es-UY', { maximumFractionDigits: 0 }) }
-function fmtM(n) {
+function fmt(n: number) { return (n ?? 0).toLocaleString('es-UY', { maximumFractionDigits: 0 }) }
+function fmtM(n: number) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
   if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K'
   return n.toFixed(0)
 }
 const tooltipStyle = { contentStyle: { background: '#22232f', border: '1px solid #2a2b3a', borderRadius: 8, fontSize: 11 }, labelStyle: { color: '#9a9bb0' }, itemStyle: { color: '#e8e9f0' } }
 
-function KPI({ label, value, sub, color }) {
+function KPI({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
   return (
     <div className="relative bg-bg-secondary border border-border-color rounded-xl p-5 overflow-hidden">
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
@@ -27,7 +27,7 @@ function KPI({ label, value, sub, color }) {
 
 export default function GasoilPage() {
   const supabase = createClient()
-  const [viajes, setViajes] = useState([])
+  const [viajes, setViajes] = useState<ViajeGas[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function GasoilPage() {
   const precioAvg   = totalLitros > 0 ? totalGasto / totalLitros : 0
 
   const barData = useMemo(() => {
-    const m = {}
+    const m: Record<string, { gasto: number; litros: number }> = {}
     viajes.forEach(v => {
       const ym = v.fecha.substring(0, 7)
       if (!m[ym]) m[ym] = { gasto: 0, litros: 0 }
@@ -83,7 +83,7 @@ export default function GasoilPage() {
               <XAxis dataKey="mes" tick={{ fill: '#6a6b80', fontSize: 9 }} axisLine={false} tickLine={false} />
               <YAxis hide />
               <Tooltip
-                formatter={(value, name) => [name === 'gasto' ? '$' + fmtM(value) : fmt(value) + ' lt', name === 'gasto' ? 'Gasto' : 'Litros']}
+                formatter={(value: number, name: string) => [name === 'gasto' ? '$' + fmtM(value) : fmt(value) + ' lt', name === 'gasto' ? 'Gasto' : 'Litros']}
                 contentStyle={tooltipStyle.contentStyle}
                 labelStyle={tooltipStyle.labelStyle}
                 itemStyle={tooltipStyle.itemStyle}
