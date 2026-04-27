@@ -15,6 +15,7 @@ import {
   X,
   Menu,
   LogOut,
+  Upload,
 } from 'lucide-react'
 
 interface NavItem {
@@ -43,6 +44,12 @@ const adminNav: NavSection[] = [
     items: [
       { href: '/reportes', icon: BarChart2, label: 'Reportes' },
       { href: '/gasoil',   icon: Fuel,     label: 'Gasoil' },
+    ],
+  },
+  {
+    section: 'Herramientas',
+    items: [
+      { href: '/importar', icon: Upload, label: 'Importar Excel' },
     ],
   },
 ]

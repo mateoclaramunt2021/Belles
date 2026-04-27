@@ -14,6 +14,7 @@ const pageTitles: Record<string, string> = {
   '/gasoil':       'Control de Gasoil',
   '/tarifas':      'Tarifas',
   '/liquidaciones':'Liquidaciones',
+  '/importar':     'Importar desde Excel',
 }
 
 function Topbar() {
