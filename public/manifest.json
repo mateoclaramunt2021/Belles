@@ -1,0 +1,39 @@
+{
+  "name": "TransControl Belles",
+  "short_name": "TransControl",
+  "description": "Sistema de gestión de flota — Belles Uruguay",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0a0b10",
+  "theme_color": "#0a0b10",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Nuevo Viaje",
+      "url": "/viajes/nuevo",
+      "description": "Registrar un nuevo viaje"
+    },
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "Ver el panel principal"
+    }
+  ]
+}
