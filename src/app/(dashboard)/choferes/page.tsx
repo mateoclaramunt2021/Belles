@@ -28,6 +28,12 @@ interface DetalleForm {
   notas: string
 }
 
+interface NuevoChoferForm {
+  nombre: string
+  email: string
+  password: string
+}
+
 const defaultForm: DetalleForm = {
   nombre_completo: '', telefono: '', licencia: '', cedula: '',
   fecha_venc_licencia: '', camion_asignado_id: '', activo: true, notas: '',
@@ -76,6 +82,9 @@ export default function ChoferesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<ChoferConDetalle | null>(null)
   const [form, setForm] = useState<DetalleForm>(defaultForm)
+  const [nuevoModal, setNuevoModal] = useState(false)
+  const [nuevoForm, setNuevoForm] = useState<NuevoChoferForm>({ nombre: '', email: '', password: '' })
+  const [creando, setCreando] = useState(false)
   const [search, setSearch] = useState('')
 
   /* ── Rendimiento state ── */
@@ -168,6 +177,28 @@ export default function ChoferesPage() {
     setSaving(false)
     if (error) toast.error('Error al guardar: ' + error.message)
     else { toast.success('Perfil actualizado'); setModalOpen(false); fetchPersonal() }
+  }
+
+  const handleCrearChofer = async () => {
+    if (!nuevoForm.nombre.trim()) { toast.error('El nombre es obligatorio'); return }
+    if (!nuevoForm.email.trim())  { toast.error('El email es obligatorio'); return }
+    if (!nuevoForm.password.trim() || nuevoForm.password.length < 6) { toast.error('La contraseña debe tener al menos 6 caracteres'); return }
+    setCreando(true)
+    try {
+      const res = await fetch('/api/admin/crear-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevoForm),
+      })
+      const json = await res.json()
+      if (!res.ok) { toast.error(json.error ?? 'Error al crear el usuario'); return }
+      toast.success(`Chofer "${nuevoForm.nombre}" creado correctamente`)
+      setNuevoModal(false)
+      setNuevoForm({ nombre: '', email: '', password: '' })
+      fetchPersonal()
+    } finally {
+      setCreando(false)
+    }
   }
 
   const filtered = useMemo(() =>
@@ -308,20 +339,13 @@ export default function ChoferesPage() {
             <div className="flex items-center gap-2">
               <input type="text" placeholder="Buscar chofer..." className="input text-xs w-48"
                 value={search} onChange={e => setSearch(e.target.value)} />
-              <a
-                href="https://supabase.com/dashboard"
-                target="_blank" rel="noreferrer"
-                className="btn-secondary flex items-center gap-2 text-xs"
-                title="Crear nuevo usuario chofer en Supabase Dashboard"
+              <button
+                onClick={() => { setNuevoForm({ nombre: '', email: '', password: '' }); setNuevoModal(true) }}
+                className="btn-primary flex items-center gap-2 text-xs"
               >
-                <UserPlus size={13} /> Nuevo usuario
-              </a>
+                <UserPlus size={13} /> Nuevo chofer
+              </button>
             </div>
-          </div>
-
-          {/* Note */}
-          <div className="bg-accent-cyan/5 border border-accent-cyan/20 rounded-xl px-4 py-3 text-xs text-text-secondary">
-            Para agregar un nuevo chofer, creá el usuario en el Dashboard de Supabase con rol <span className="font-mono text-accent-cyan">chofer</span>, luego aparecerá aquí para configurar su perfil.
           </div>
 
           {/* Cards */}
@@ -451,6 +475,43 @@ export default function ChoferesPage() {
           )}
         </div>
       )}
+
+      {/* ── Modal nuevo chofer ── */}
+      <Modal
+        open={nuevoModal}
+        onClose={() => setNuevoModal(false)}
+        title="Crear nuevo chofer"
+        footer={
+          <>
+            <button onClick={() => setNuevoModal(false)} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={handleCrearChofer} disabled={creando} className="btn-primary text-sm">
+              {creando ? 'Creando...' : 'Crear chofer'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="bg-accent-cyan/5 border border-accent-cyan/20 rounded-xl px-4 py-3 text-xs text-text-secondary">
+            Se creará un usuario con acceso al portal de choferes. El chofer podrá iniciar sesión con el email y contraseña que definas acá.
+          </div>
+          <div className="form-group">
+            <label className="label">Nombre completo *</label>
+            <input type="text" className="input" placeholder="Juan Pérez"
+              value={nuevoForm.nombre} onChange={e => setNuevoForm(p => ({ ...p, nombre: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="label">Email *</label>
+            <input type="email" className="input" placeholder="juan@belles.com.uy"
+              value={nuevoForm.email} onChange={e => setNuevoForm(p => ({ ...p, email: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="label">Contraseña *</label>
+            <input type="text" className="input font-mono" placeholder="Mínimo 6 caracteres"
+              value={nuevoForm.password} onChange={e => setNuevoForm(p => ({ ...p, password: e.target.value }))} />
+            <p className="text-xs text-text-secondary mt-1">Anotá esta contraseña para dársela al chofer.</p>
+          </div>
+        </div>
+      </Modal>
 
       {/* ── Modal editar/crear perfil ── */}
       <Modal
