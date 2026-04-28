@@ -1,330 +1,236 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
+import Link from 'next/link'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
+import { Truck, Scale, DollarSign, CalendarDays, ArrowRight, TrendingUp } from 'lucide-react'
 
-interface Viaje {
-  id: string
-  fecha: string
-  matricula: string
-  chofer_nombre: string
-  cliente_nombre: string
-  origen: string
-  destino: string
-  mercaderia: string
-  importe: number
-  gasto_gasoil: number
-  litros_gasoil: number
-  comision: number
-  peajes: number
-  imprevistos: number
-  toneladas: number
-  km: number
-  estado_cobro: 'pendiente' | 'cobrado'
+/* ─── Helpers ────────────────────────────────────────────── */
+
+function fmt(n: number) { return (n ?? 0).toLocaleString('es-UY', { maximumFractionDigits: 0 }) }
+function fmtDec(n: number, d = 2) { return (n ?? 0).toLocaleString('es-UY', { minimumFractionDigits: d, maximumFractionDigits: d }) }
+
+function getQuincena() {
+  const now = new Date()
+  const day = now.getDate()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  if (day <= 15) return { label: '1° Quincena', desde: `01/${m}`, hasta: `15/${m}` }
+  return { label: '2° Quincena', desde: `16/${m}`, hasta: `${lastDay}/${m}` }
 }
 
-const COLORS = ['#00d4ff','#7c5fff','#00e89d','#ffa502','#ff4757','#ff6b9d','#a29bfe','#fd9644','#45aaf2','#26de81']
-
-function fmtM(n: number): string {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
-  if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K'
-  return n.toFixed(0)
-}
-function fmt(n: number): string {
-  return n.toLocaleString('es-UY', { maximumFractionDigits: 0 })
+function monthRange() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const last = new Date(y, now.getMonth() + 1, 0).getDate()
+  return { desde: `${y}-${m}-01`, hasta: `${y}-${m}-${last}` }
 }
 
-function KPI({ label, value, sub, color }: {
-  label: string; value: string; sub?: string
-  color: 'blue' | 'green' | 'orange' | 'purple'
-}) {
-  const top: Record<string, string> = {
-    blue: 'linear-gradient(135deg,#00d4ff,#7c5fff)',
-    green: 'linear-gradient(135deg,#00e89d,#00d4ff)',
-    orange: 'linear-gradient(135deg,#ffa502,#ff4757)',
-    purple: 'linear-gradient(135deg,#7c5fff,#ff6b9d)',
+function last7Days() {
+  const days: string[] = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i)
+    days.push(d.toISOString().slice(0, 10))
   }
-  const clr: Record<string, string> = {
-    blue: '#00d4ff', green: '#00e89d', orange: '#ffa502', purple: '#7c5fff',
-  }
-  return (
-    <div className="relative bg-bg-secondary border border-border-color rounded-xl p-5 overflow-hidden">
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: top[color] }} />
-      <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary mb-2">{label}</p>
-      <p className="font-mono text-2xl font-bold" style={{ color: clr[color] }}>{value}</p>
-      {sub && <p className="font-mono text-xs text-text-secondary mt-1">{sub}</p>}
-    </div>
-  )
+  return days
 }
 
+function quincenaDeViaje(fecha: string) {
+  const day = parseInt(fecha.slice(8, 10))
+  return day <= 15 ? '1° Quincena' : '2° Quincena'
+}
+
+const COLORS = ['#00d4ff', '#7c5fff', '#00e89d', '#ffa502', '#ff4757', '#ff6b9d', '#a29bfe', '#fd9644']
 const tooltipStyle = {
   contentStyle: { background: '#22232f', border: '1px solid #2a2b3a', borderRadius: 8, fontSize: 11 },
   labelStyle: { color: '#9a9bb0' },
   itemStyle: { color: '#e8e9f0' },
 }
 
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+/* ─── KPI Card ───────────────────────────────────────────── */
+
+function KPICard({
+  label, value, sub, icon: Icon, gradient, iconBg,
+}: {
+  label: string; value: string; sub: string
+  icon: React.ElementType; gradient: string; iconBg: string
+}) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</label>
-      {children}
+    <div className="bg-bg-secondary border border-border-color rounded-2xl p-5 flex items-center gap-4 relative overflow-hidden">
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: gradient }} />
+      <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
+        <Icon size={22} style={{ color: gradient.includes('00d4ff') ? '#00d4ff' : gradient.includes('00e89d') ? '#00e89d' : gradient.includes('ffa502') ? '#ffa502' : '#7c5fff' }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-text-secondary uppercase tracking-widest font-semibold truncate">{label}</p>
+        <p className="font-mono text-xl font-bold text-text-primary leading-tight mt-0.5">{value}</p>
+        <p className="text-xs text-text-secondary mt-0.5">{sub}</p>
+      </div>
     </div>
   )
+}
+
+/* ─── Page ───────────────────────────────────────────────── */
+
+interface ViajeRow {
+  id: string; fecha: string; fecha_carga: string | null; fecha_descarga: string | null
+  numero_remito: string; numero_remito_carga: string; matricula: string
+  chofer_nombre: string; destino: string; toneladas: number
+  tarifa_aplicada: number; importe: number; estado_cobro: string
 }
 
 export default function DashboardPage() {
   const supabase = createClient()
   const { isAdmin, profile } = useAuth()
 
-  const [viajes, setViajes] = useState<Viaje[]>([])
+  const [viajes, setViajes] = useState<ViajeRow[]>([])
   const [loading, setLoading] = useState(true)
-
-  const [fMat, setFMat] = useState('')
-  const [fCho, setFCho] = useState('')
-  const [fCli, setFCli] = useState('')
-  const [fFrom, setFFrom] = useState('')
-  const [fTo, setFTo] = useState('')
+  const quincena = getQuincena()
+  const { desde: mesDesde, hasta: mesHasta } = monthRange()
 
   useEffect(() => {
     const load = async () => {
       let q = supabase
         .from('viajes')
-        .select('id,fecha,matricula,chofer_nombre,cliente_nombre,origen,destino,mercaderia,importe,gasto_gasoil,litros_gasoil,comision,peajes,imprevistos,toneladas,km,estado_cobro')
+        .select('id,fecha,fecha_carga,fecha_descarga,numero_remito,numero_remito_carga,matricula,chofer_nombre,destino,toneladas,tarifa_aplicada,importe,estado_cobro')
         .order('fecha', { ascending: false })
+        .limit(300)
       if (!isAdmin && profile?.id) q = (q as any).eq('chofer_id', profile.id)
       const { data } = await q
-      setViajes((data ?? []) as Viaje[])
+      setViajes((data ?? []) as ViajeRow[])
       setLoading(false)
     }
     load()
   }, [supabase, isAdmin, profile?.id])
 
-  const filtered = useMemo(() => viajes.filter(v => {
-    if (fMat && v.matricula !== fMat) return false
-    if (fCho && v.chofer_nombre !== fCho) return false
-    if (fCli && v.cliente_nombre !== fCli) return false
-    if (fFrom && v.fecha < fFrom) return false
-    if (fTo && v.fecha > fTo) return false
-    return true
-  }), [viajes, fMat, fCho, fCli, fFrom, fTo])
-
-  const matriculas = useMemo(() => [...new Set(viajes.map(v => v.matricula))].sort(), [viajes])
-  const choferes   = useMemo(() => [...new Set(viajes.map(v => v.chofer_nombre).filter(Boolean))].sort(), [viajes])
-  const clientes   = useMemo(() => [...new Set(viajes.map(v => v.cliente_nombre).filter(Boolean))].sort(), [viajes])
-
-  const totalInc      = useMemo(() => filtered.reduce((s, v) => s + (v.importe ?? 0), 0), [filtered])
-  const totalGas      = useMemo(() => filtered.reduce((s, v) => s + (v.gasto_gasoil ?? 0), 0), [filtered])
-  const totalCom      = useMemo(() => filtered.reduce((s, v) => s + (v.comision ?? 0), 0), [filtered])
-  const totalPj       = useMemo(() => filtered.reduce((s, v) => s + (v.peajes ?? 0), 0), [filtered])
-  const totalImp      = useMemo(() => filtered.reduce((s, v) => s + (v.imprevistos ?? 0), 0), [filtered])
-  const totalProfit   = totalInc - totalGas - totalCom - totalPj - totalImp
-  const totalLts      = useMemo(() => filtered.reduce((s, v) => s + (v.litros_gasoil ?? 0), 0), [filtered])
-  const totalTons     = useMemo(() => filtered.reduce((s, v) => s + (v.toneladas ?? 0), 0), [filtered])
-  const totalKm       = useMemo(() => filtered.reduce((s, v) => s + (v.km ?? 0), 0), [filtered])
-  const pendientes    = useMemo(() => filtered.filter(v => v.estado_cobro === 'pendiente'), [filtered])
-  const pendientesMonto = useMemo(() => pendientes.reduce((s, v) => s + (v.importe ?? 0), 0), [pendientes])
-  const margin        = totalInc > 0 ? ((totalProfit / totalInc) * 100).toFixed(1) : '0'
-
-  const barData = useMemo(() => {
-    const m: Record<string, { inc: number; exp: number }> = {}
-    filtered.forEach(v => {
-      const ym = v.fecha.substring(0, 7)
-      if (!m[ym]) m[ym] = { inc: 0, exp: 0 }
-      m[ym].inc += v.importe ?? 0
-      m[ym].exp += (v.gasto_gasoil ?? 0) + (v.comision ?? 0) + (v.peajes ?? 0)
-    })
-    return Object.keys(m).sort().slice(-12).map(k => ({
-      mes: k.substring(5), ingresos: m[k].inc, gastos: m[k].exp,
-    }))
-  }, [filtered])
-
-  const donutData = useMemo(() => {
-    const m: Record<string, number> = {}
-    filtered.forEach(v => { m[v.matricula] = (m[v.matricula] ?? 0) + (v.importe ?? 0) })
-    return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }))
-  }, [filtered])
-
-  const tableData = useMemo(() =>
-    [...filtered].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 100),
-    [filtered]
+  /* ── KPIs del mes ── */
+  const viajesMes = useMemo(() =>
+    viajes.filter(v => (v.fecha_carga ?? v.fecha) >= mesDesde && (v.fecha_carga ?? v.fecha) <= mesHasta),
+    [viajes, mesDesde, mesHasta]
   )
+  const totalViajes   = viajesMes.length
+  const totalTons     = viajesMes.reduce((s, v) => s + (v.toneladas ?? 0), 0)
+  const totalCobrar   = viajesMes.reduce((s, v) => s + (v.importe ?? 0), 0)
+  const pendientesCnt = viajesMes.filter(v => v.estado_cobro === 'pendiente').length
 
-  const clearFilters = () => { setFMat(''); setFCho(''); setFCli(''); setFFrom(''); setFTo('') }
+  /* ── Últimos 10 viajes ── */
+  const ultimosViajes = useMemo(() => viajes.slice(0, 10), [viajes])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  /* ── Línea: toneladas últimos 7 días ── */
+  const lineData = useMemo(() => {
+    const days = last7Days()
+    const map: Record<string, number> = {}
+    viajes.forEach(v => {
+      const f = v.fecha_carga ?? v.fecha
+      if (days.includes(f)) map[f] = (map[f] ?? 0) + (v.toneladas ?? 0)
+    })
+    return days.map(d => ({
+      dia: d.slice(5).replace('-', '/'),
+      toneladas: parseFloat((map[d] ?? 0).toFixed(2)),
+    }))
+  }, [viajes])
+
+  /* ── Donut: distribución por destino ── */
+  const donutData = useMemo(() => {
+    const map: Record<string, number> = {}
+    viajesMes.forEach(v => { if (v.destino) map[v.destino] = (map[v.destino] ?? 0) + (v.toneladas ?? 0) })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8)
+      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
+  }, [viajesMes])
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <KPI label="Ingresos Totales"    value={'$' + fmtM(totalInc)}         sub={fmt(filtered.length) + ' viajes'}             color="blue"   />
-        <KPI label="Beneficio Neto"      value={'$' + fmtM(totalProfit)}      sub={'Margen: ' + margin + '%'}                    color="green"  />
-        <KPI label="Pendientes Cobro"    value={'$' + fmtM(pendientesMonto)}  sub={pendientes.length + ' viajes sin cobrar'}     color="orange" />
-        <KPI label="Gasto Gasoil"        value={'$' + fmtM(totalGas)}         sub={fmt(Math.round(totalLts)) + ' litros'}        color="purple" />
-        <KPI label="Km Recorridos"       value={fmtM(totalKm) + ' km'}        sub={'Promedio ' + (filtered.length > 0 ? fmt(Math.round(totalKm / filtered.length)) : '0') + ' km/viaje'} color="blue"   />
-        <KPI label="Toneladas Transportadas" value={fmt(Math.round(totalTons)) + ' t'} sub={'Comisiones: $' + fmtM(totalCom)}   color="green"  />
+
+      {/* ── KPI Row ── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <KPICard
+          label="Viajes (mes actual)"
+          value={String(totalViajes)}
+          sub="Todos los viajes realizados"
+          icon={Truck}
+          gradient="linear-gradient(135deg,#00d4ff,#7c5fff)"
+          iconBg="rgba(0,212,255,0.12)"
+        />
+        <KPICard
+          label="Toneladas (mes actual)"
+          value={fmtDec(totalTons, 2) + ' tn'}
+          sub="Total de toneladas"
+          icon={Scale}
+          gradient="linear-gradient(135deg,#00e89d,#00d4ff)"
+          iconBg="rgba(0,232,157,0.12)"
+        />
+        <KPICard
+          label="Total a cobrar (mes actual)"
+          value={'$ ' + fmt(totalCobrar)}
+          sub="Importe total generado"
+          icon={DollarSign}
+          gradient="linear-gradient(135deg,#ffa502,#ff4757)"
+          iconBg="rgba(255,165,2,0.12)"
+        />
+        <KPICard
+          label="Quincena actual"
+          value={quincena.label}
+          sub={`Del ${quincena.desde} al ${quincena.hasta}`}
+          icon={CalendarDays}
+          gradient="linear-gradient(135deg,#7c5fff,#ff6b9d)"
+          iconBg="rgba(124,95,255,0.12)"
+        />
       </div>
 
-      {/* Filters */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-3">
-          <svg className="w-3.5 h-3.5 text-accent-cyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
-          <span className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Filtros</span>
+      {/* ── Últimos viajes cargados ── */}
+      <div className="bg-bg-secondary border border-border-color rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-color">
+          <h3 className="text-sm font-semibold text-text-primary">Últimos viajes cargados</h3>
+          <Link href="/viajes" className="flex items-center gap-1 text-xs text-accent-cyan hover:underline">
+            Ver todos los viajes <ArrowRight size={12} />
+          </Link>
         </div>
-        <div className="flex flex-wrap gap-3 items-end">
-          <FilterGroup label="Matrícula">
-            <select className="input text-xs" value={fMat} onChange={e => setFMat(e.target.value)}>
-              <option value="">Todas</option>
-              {matriculas.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </FilterGroup>
-          <FilterGroup label="Chofer">
-            <select className="input text-xs" value={fCho} onChange={e => setFCho(e.target.value)}>
-              <option value="">Todos</option>
-              {choferes.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </FilterGroup>
-          <FilterGroup label="Cliente">
-            <select className="input text-xs" value={fCli} onChange={e => setFCli(e.target.value)}>
-              <option value="">Todos</option>
-              {clientes.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </FilterGroup>
-          <FilterGroup label="Desde">
-            <input type="date" className="input text-xs" value={fFrom} onChange={e => setFFrom(e.target.value)} />
-          </FilterGroup>
-          <FilterGroup label="Hasta">
-            <input type="date" className="input text-xs" value={fTo} onChange={e => setFTo(e.target.value)} />
-          </FilterGroup>
-          <button className="btn-ghost text-xs self-end" onClick={clearFilters}>Limpiar</button>
-        </div>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Bar chart */}
-        <div className="lg:col-span-2 card">
-          <h3 className="text-sm font-semibold mb-4 text-text-primary">Ingresos vs Gastos por Mes</h3>
-          {barData.length === 0 ? (
-            <div className="h-52 flex items-center justify-center text-text-secondary text-xs">Sin datos</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={barData} barGap={3} barCategoryGap="30%">
-                <defs>
-                  <linearGradient id="incGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00d4ff" />
-                    <stop offset="100%" stopColor="#7c5fff" />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="mes" tick={{ fill: '#6a6b80', fontSize: 9, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip
-                  formatter={(value: number, name: string) => ['$' + fmtM(value), name === 'ingresos' ? 'Ingresos' : 'Gastos']}
-                  contentStyle={tooltipStyle.contentStyle}
-                  labelStyle={tooltipStyle.labelStyle}
-                  itemStyle={tooltipStyle.itemStyle}
-                />
-                <Bar dataKey="ingresos" fill="url(#incGrad)" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="gastos"   fill="#ff4757"        radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-          <div className="flex gap-4 mt-2">
-            <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-              <span className="w-3 h-2 rounded-sm inline-block" style={{ background: 'linear-gradient(135deg,#00d4ff,#7c5fff)' }} />
-              Ingresos
-            </span>
-            <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-              <span className="w-3 h-2 rounded-sm bg-danger inline-block" />
-              Gastos
-            </span>
-          </div>
-        </div>
-
-        {/* Donut chart */}
-        <div className="card">
-          <h3 className="text-sm font-semibold mb-4 text-text-primary">Distribución por Camión</h3>
-          {donutData.length === 0 ? (
-            <div className="h-52 flex items-center justify-center text-text-secondary text-xs">Sin datos</div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie data={donutData} cx="50%" cy="50%" innerRadius={45} outerRadius={72} dataKey="value" paddingAngle={2}>
-                    {donutData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => '$' + fmtM(v)} contentStyle={tooltipStyle.contentStyle} itemStyle={tooltipStyle.itemStyle} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-2 space-y-1.5">
-                {donutData.slice(0, 6).map((d, i) => {
-                  const total = donutData.reduce((s, x) => s + x.value, 0)
-                  const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0'
-                  return (
-                    <div key={d.name} className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                      <span className="text-xs text-text-secondary flex-1 truncate">{d.name}</span>
-                      <span className="font-mono text-xs text-text-secondary">{pct}%</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Trips table */}
-      <div className="bg-bg-secondary border border-border-color rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-color">
-          <h3 className="text-sm font-semibold text-text-primary">Últimos Viajes</h3>
-          <span className="font-mono text-xs text-text-secondary">{filtered.length} registros</span>
-        </div>
-        <div className="overflow-x-auto" style={{ maxHeight: 480 }}>
+        <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
-            <thead className="sticky top-0 z-10">
+            <thead>
               <tr>
-                {['Fecha','Matrícula','Chofer','Cliente','Origen → Destino','Mercadería','Importe','Gasoil','Beneficio'].map(h => (
-                  <th key={h} className="table-header text-left whitespace-nowrap px-4 py-2.5">{h}</th>
+                {['Fecha','Remito','Matrícula','Chofer','Destino','Toneladas','Tarifa/Tn','Total a cobrar','Quincena'].map(h => (
+                  <th key={h} className="table-header text-left whitespace-nowrap px-4 py-3">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {tableData.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-10 text-text-secondary">Sin viajes registrados</td>
-                </tr>
-              ) : tableData.map(v => {
-                const profit = (v.importe ?? 0) - (v.gasto_gasoil ?? 0) - (v.comision ?? 0) - (v.peajes ?? 0) - (v.imprevistos ?? 0)
+              {ultimosViajes.length === 0 ? (
+                <tr><td colSpan={9} className="py-12 text-center text-text-secondary">Sin viajes registrados</td></tr>
+              ) : ultimosViajes.map(v => {
+                const fecha = v.fecha_descarga ?? v.fecha_carga ?? v.fecha
+                const remito = v.numero_remito_carga || v.numero_remito
+                const qLabel = quincenaDeViaje(v.fecha_carga ?? v.fecha)
                 return (
-                  <tr key={v.id} className="table-row-hover border-b border-border-color/50">
-                    <td className="table-cell font-mono whitespace-nowrap">{v.fecha}</td>
-                    <td className="table-cell whitespace-nowrap">
-                      <span className="bg-accent-cyan/10 text-accent-cyan px-2 py-0.5 rounded font-mono text-xs font-semibold">
-                        {v.matricula}
-                      </span>
+                  <tr key={v.id} className="table-row-hover border-b border-border-color/40">
+                    <td className="table-cell px-4 font-mono whitespace-nowrap">{fecha}</td>
+                    <td className="table-cell px-4 font-mono text-accent-cyan">{remito}</td>
+                    <td className="table-cell px-4">
+                      <span className="bg-accent-cyan/10 text-accent-cyan px-2 py-0.5 rounded font-mono font-semibold">{v.matricula}</span>
                     </td>
-                    <td className="table-cell whitespace-nowrap">{v.chofer_nombre}</td>
-                    <td className="table-cell whitespace-nowrap">{v.cliente_nombre}</td>
-                    <td className="table-cell whitespace-nowrap">{v.origen} → {v.destino}</td>
-                    <td className="table-cell">{v.mercaderia}</td>
-                    <td className="table-cell text-right font-mono whitespace-nowrap">${fmt(v.importe ?? 0)}</td>
-                    <td className="table-cell text-right font-mono text-danger whitespace-nowrap">${fmt(v.gasto_gasoil ?? 0)}</td>
-                    <td className={`table-cell text-right font-mono font-semibold whitespace-nowrap ${profit >= 0 ? 'text-success' : 'text-danger'}`}>
-                      ${fmt(profit)}
+                    <td className="table-cell px-4 whitespace-nowrap font-medium text-text-primary">{v.chofer_nombre}</td>
+                    <td className="table-cell px-4">
+                      <span className="bg-bg-tertiary border border-border-color px-2 py-0.5 rounded text-text-primary">{v.destino}</span>
+                    </td>
+                    <td className="table-cell px-4 font-mono text-right">{fmtDec(v.toneladas, 2)}</td>
+                    <td className="table-cell px-4 font-mono text-right">${fmt(v.tarifa_aplicada)}</td>
+                    <td className="table-cell px-4 font-mono text-right text-success font-semibold">$ {fmt(v.importe)}</td>
+                    <td className="table-cell px-4">
+                      <span className="bg-success/10 text-success border border-success/20 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap">
+                        {qLabel}
+                      </span>
                     </td>
                   </tr>
                 )
@@ -332,7 +238,95 @@ export default function DashboardPage() {
             </tbody>
           </table>
         </div>
+        {pendientesCnt > 0 && (
+          <div className="px-6 py-3 border-t border-border-color flex items-center gap-2 text-xs text-warning">
+            <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+            {pendientesCnt} {pendientesCnt === 1 ? 'viaje pendiente' : 'viajes pendientes'} de cobro este mes
+          </div>
+        )}
       </div>
+
+      {/* ── Charts Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        {/* Donut destinos */}
+        <div className="lg:col-span-2 bg-bg-secondary border border-border-color rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-text-primary mb-4">Total por destino (mes actual)</h3>
+          {donutData.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-text-secondary text-xs">Sin datos este mes</div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width={140} height={140}>
+                <PieChart>
+                  <Pie data={donutData} cx="50%" cy="50%" innerRadius={40} outerRadius={65}
+                    dataKey="value" paddingAngle={2}>
+                    {donutData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: number) => [fmtDec(v, 2) + ' tn', '']}
+                    contentStyle={tooltipStyle.contentStyle}
+                    itemStyle={tooltipStyle.itemStyle}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-col gap-2 flex-1 min-w-0">
+                {donutData.map((d, i) => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                    <span className="text-xs text-text-secondary truncate flex-1">{d.name}</span>
+                    <span className="font-mono text-xs text-text-primary flex-shrink-0">{fmtDec(d.value, 1)} tn</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Line chart 7 días */}
+        <div className="lg:col-span-3 bg-bg-secondary border border-border-color rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={15} className="text-accent-cyan" />
+            <h3 className="text-sm font-semibold text-text-primary">Evolución de toneladas (últimos 7 días)</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={lineData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#00d4ff" />
+                  <stop offset="100%" stopColor="#00e89d" />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="dia" tick={{ fill: '#6a6b80', fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip
+                formatter={(v: number) => [fmtDec(v, 2) + ' tn', 'Toneladas']}
+                contentStyle={tooltipStyle.contentStyle}
+                labelStyle={tooltipStyle.labelStyle}
+                itemStyle={tooltipStyle.itemStyle}
+              />
+              <Line
+                type="monotone" dataKey="toneladas"
+                stroke="url(#lineGrad)" strokeWidth={2.5}
+                dot={{ r: 4, fill: '#00d4ff', strokeWidth: 0 }}
+                activeDot={{ r: 6, fill: '#00e89d' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-color">
+            <span className="text-xs text-text-secondary">
+              Total 7 días: <span className="font-mono text-text-primary font-semibold">
+                {fmtDec(lineData.reduce((s, d) => s + d.toneladas, 0), 2)} tn
+              </span>
+            </span>
+            <span className="text-xs text-text-secondary">
+              Prom/día: <span className="font-mono text-text-primary font-semibold">
+                {fmtDec(lineData.reduce((s, d) => s + d.toneladas, 0) / 7, 2)} tn
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }
