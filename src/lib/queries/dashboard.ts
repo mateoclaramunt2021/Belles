@@ -25,7 +25,7 @@ export async function getDashboardKPIs(userId?: string, isAdmin = false): Promis
 
   if (!viajes) return {
     ingresos_mes: 0, beneficio_neto: 0, total_viajes_mes: 0,
-    gasto_gasoil_mes: 0, toneladas_mes: 0, pendientes_cobro: 0,
+    gasto_gasoil_mes: 0, toneladas_mes: 0, pendientes_cobro: 0, pendientes_monto: 0,
   }
 
   const ingresos_mes    = viajes.reduce((s, v) => s + (v.importe ?? 0), 0)
@@ -34,9 +34,9 @@ export async function getDashboardKPIs(userId?: string, isAdmin = false): Promis
   const peajes          = viajes.reduce((s, v) => s + (v.peajes ?? 0), 0)
   const beneficio_neto  = ingresos_mes - gasto_gasoil - comisiones - peajes
   const toneladas_mes   = viajes.reduce((s, v) => s + (v.toneladas ?? 0), 0)
-  const pendientes_cobro = viajes
-    .filter((v) => v.estado_cobro === 'pendiente')
-    .reduce((s, v) => s + (v.importe ?? 0), 0)
+  const pendientesList = viajes.filter((v) => v.estado_cobro === 'pendiente')
+  const pendientes_cobro = pendientesList.length
+  const pendientes_monto = pendientesList.reduce((s, v) => s + (v.importe ?? 0), 0)
 
   return {
     ingresos_mes,
@@ -45,6 +45,7 @@ export async function getDashboardKPIs(userId?: string, isAdmin = false): Promis
     gasto_gasoil_mes: gasto_gasoil,
     toneladas_mes,
     pendientes_cobro,
+    pendientes_monto,
   }
 }
 

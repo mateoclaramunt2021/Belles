@@ -22,7 +22,10 @@ interface Viaje {
   litros_gasoil: number
   comision: number
   peajes: number
+  imprevistos: number
   toneladas: number
+  km: number
+  estado_cobro: 'pendiente' | 'cobrado'
 }
 
 const COLORS = ['#00d4ff','#7c5fff','#00e89d','#ffa502','#ff4757','#ff6b9d','#a29bfe','#fd9644','#45aaf2','#26de81']
@@ -91,7 +94,7 @@ export default function DashboardPage() {
     const load = async () => {
       let q = supabase
         .from('viajes')
-        .select('id,fecha,matricula,chofer_nombre,cliente_nombre,origen,destino,mercaderia,importe,gasto_gasoil,litros_gasoil,comision,peajes,toneladas')
+        .select('id,fecha,matricula,chofer_nombre,cliente_nombre,origen,destino,mercaderia,importe,gasto_gasoil,litros_gasoil,comision,peajes,imprevistos,toneladas,km,estado_cobro')
         .order('fecha', { ascending: false })
       if (!isAdmin && profile?.id) q = (q as any).eq('chofer_id', profile.id)
       const { data } = await q
@@ -114,14 +117,18 @@ export default function DashboardPage() {
   const choferes   = useMemo(() => [...new Set(viajes.map(v => v.chofer_nombre).filter(Boolean))].sort(), [viajes])
   const clientes   = useMemo(() => [...new Set(viajes.map(v => v.cliente_nombre).filter(Boolean))].sort(), [viajes])
 
-  const totalInc    = useMemo(() => filtered.reduce((s, v) => s + (v.importe ?? 0), 0), [filtered])
-  const totalGas    = useMemo(() => filtered.reduce((s, v) => s + (v.gasto_gasoil ?? 0), 0), [filtered])
-  const totalCom    = useMemo(() => filtered.reduce((s, v) => s + (v.comision ?? 0), 0), [filtered])
-  const totalPj     = useMemo(() => filtered.reduce((s, v) => s + (v.peajes ?? 0), 0), [filtered])
-  const totalProfit = totalInc - totalGas - totalCom - totalPj
-  const totalLts    = useMemo(() => filtered.reduce((s, v) => s + (v.litros_gasoil ?? 0), 0), [filtered])
-  const totalTons   = useMemo(() => filtered.reduce((s, v) => s + (v.toneladas ?? 0), 0), [filtered])
-  const margin      = totalInc > 0 ? ((totalProfit / totalInc) * 100).toFixed(1) : '0'
+  const totalInc      = useMemo(() => filtered.reduce((s, v) => s + (v.importe ?? 0), 0), [filtered])
+  const totalGas      = useMemo(() => filtered.reduce((s, v) => s + (v.gasto_gasoil ?? 0), 0), [filtered])
+  const totalCom      = useMemo(() => filtered.reduce((s, v) => s + (v.comision ?? 0), 0), [filtered])
+  const totalPj       = useMemo(() => filtered.reduce((s, v) => s + (v.peajes ?? 0), 0), [filtered])
+  const totalImp      = useMemo(() => filtered.reduce((s, v) => s + (v.imprevistos ?? 0), 0), [filtered])
+  const totalProfit   = totalInc - totalGas - totalCom - totalPj - totalImp
+  const totalLts      = useMemo(() => filtered.reduce((s, v) => s + (v.litros_gasoil ?? 0), 0), [filtered])
+  const totalTons     = useMemo(() => filtered.reduce((s, v) => s + (v.toneladas ?? 0), 0), [filtered])
+  const totalKm       = useMemo(() => filtered.reduce((s, v) => s + (v.km ?? 0), 0), [filtered])
+  const pendientes    = useMemo(() => filtered.filter(v => v.estado_cobro === 'pendiente'), [filtered])
+  const pendientesMonto = useMemo(() => pendientes.reduce((s, v) => s + (v.importe ?? 0), 0), [pendientes])
+  const margin        = totalInc > 0 ? ((totalProfit / totalInc) * 100).toFixed(1) : '0'
 
   const barData = useMemo(() => {
     const m: Record<string, { inc: number; exp: number }> = {}
@@ -160,11 +167,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Ingresos Totales"  value={'$' + fmtM(totalInc)}    sub={fmt(filtered.length) + ' viajes'}       color="blue"   />
-        <KPI label="Beneficio Neto"    value={'$' + fmtM(totalProfit)} sub={'Margen: ' + margin + '%'}              color="green"  />
-        <KPI label="Total Viajes"      value={fmt(filtered.length)}    sub={fmt(Math.round(totalTons)) + ' tons'}   color="orange" />
-        <KPI label="Gasto Gasoil"      value={'$' + fmtM(totalGas)}   sub={fmt(Math.round(totalLts)) + ' litros'}  color="purple" />
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <KPI label="Ingresos Totales"    value={'$' + fmtM(totalInc)}         sub={fmt(filtered.length) + ' viajes'}             color="blue"   />
+        <KPI label="Beneficio Neto"      value={'$' + fmtM(totalProfit)}      sub={'Margen: ' + margin + '%'}                    color="green"  />
+        <KPI label="Pendientes Cobro"    value={'$' + fmtM(pendientesMonto)}  sub={pendientes.length + ' viajes sin cobrar'}     color="orange" />
+        <KPI label="Gasto Gasoil"        value={'$' + fmtM(totalGas)}         sub={fmt(Math.round(totalLts)) + ' litros'}        color="purple" />
+        <KPI label="Km Recorridos"       value={fmtM(totalKm) + ' km'}        sub={'Promedio ' + (filtered.length > 0 ? fmt(Math.round(totalKm / filtered.length)) : '0') + ' km/viaje'} color="blue"   />
+        <KPI label="Toneladas Transportadas" value={fmt(Math.round(totalTons)) + ' t'} sub={'Comisiones: $' + fmtM(totalCom)}   color="green"  />
       </div>
 
       {/* Filters */}
@@ -299,7 +308,7 @@ export default function DashboardPage() {
                   <td colSpan={9} className="text-center py-10 text-text-secondary">Sin viajes registrados</td>
                 </tr>
               ) : tableData.map(v => {
-                const profit = (v.importe ?? 0) - (v.gasto_gasoil ?? 0) - (v.comision ?? 0) - (v.peajes ?? 0)
+                const profit = (v.importe ?? 0) - (v.gasto_gasoil ?? 0) - (v.comision ?? 0) - (v.peajes ?? 0) - (v.imprevistos ?? 0)
                 return (
                   <tr key={v.id} className="table-row-hover border-b border-border-color/50">
                     <td className="table-cell font-mono whitespace-nowrap">{v.fecha}</td>

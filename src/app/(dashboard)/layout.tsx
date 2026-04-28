@@ -7,13 +7,16 @@ import { useAuth } from '@/contexts/AuthContext'
 
 const pageTitles: Record<string, string> = {
   '/dashboard':    'Dashboard General',
-  '/viajes':       'Explorador de Viajes',
+  '/viajes':       'Control de Viajes',
+  '/viajes/nuevo': 'Nuevo Viaje',
   '/camiones':     'Flota de Camiones',
-  '/choferes':     'Rendimiento de Choferes',
+  '/choferes':     'Choferes',
+  '/clientes':     'Clientes',
   '/reportes':     'Reportes y Análisis',
   '/gasoil':       'Control de Gasoil',
   '/tarifas':      'Tarifas',
   '/liquidaciones':'Liquidaciones',
+  '/chat':         'Chat con Choferes',
   '/importar':     'Importar desde Excel',
 }
 
